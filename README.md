@@ -6,12 +6,12 @@
   - train data: 32,470개
   - test data: 7,765개
 - 평가 방법
-  - ㅇㅅㅇ
+  - .
 - 개발 스택: `Git` `Notion` `Ubuntu` `Python` `Pytorch Lightning` `Wandb`
 - 결과: 
 
 # 목차
-[1. 팀원 소개](#1-팀원-소개)
+[1. 팀원 소개](#1-팀원-소개) > [2. 프로젝트 구조](#2-프로젝트-구조)
 
 # 1. 팀원 소개
 
@@ -24,27 +24,27 @@
             <br />
         </td>
         <td align="center" width="150px">
-            <a href="https://github.com/seongeun-k"><img height="120px" width="120px" src="https://avatars.githubusercontent.com/seongeun-k"/></a>
+            <a href="https://github.com/heejinsara"><img height="120px" width="120px" src="https://avatars.githubusercontent.com/heejinsara"/></a>
             <br/>
-            <a href="https://github.com/seongeun-k"><strong>김성은</strong></a>
+            <a href="https://github.com/heejinsara"><strong>박희진</strong></a>
             <br />
         </td>
         <td align="center" width="150px">
-            <a href="https://github.com/KimuGenie"><img height="120px" width="120px" src="https://avatars.githubusercontent.com/KimuGenie"/></a>
+            <a href="https://github.com/LewisVille-flow"><img height="120px" width="120px" src="https://avatars.githubusercontent.com/LewisVille-flow"/></a>
             <br/>
-            <a href="https://github.com/KimuGenie"><strong>김의진</strong></a>
+            <a href="https://github.com/LewisVille-flow"><strong>이주형</strong></a>
             <br />
         </td>
         <td align="center" width="150px">
-            <a href="https://github.com/ella0106"><img height="120px" width="120px" src="https://avatars.githubusercontent.com/ella0106"/></a>
+            <a href="https://github.com/Forbuds"><img height="120px" width="120px" src="https://avatars.githubusercontent.com/Forbuds"/></a>
             <br/>
-            <a href="https://github.com/ella0106"><strong>박지연</strong></a>
+            <a href="https://github.com/Forbuds"><strong>천소영</strong></a>
             <br />
         </td>
         <td align="center" width="150px">
-            <a href="https://github.com/jys8332"><img height="120px" width="120px" src="https://avatars.githubusercontent.com/jys8332"/></a>
+            <a href="https://github.com/rustic-snob"><img height="120px" width="120px" src="https://avatars.githubusercontent.com/rustic-snob"/></a>
             <br/>
-            <a href="https://github.com/jys8332"><strong>정윤석</strong></a>
+            <a href="https://github.com/rustic-snob"><strong>천재원</strong></a>
             <br />
         </td>
     </tr>
