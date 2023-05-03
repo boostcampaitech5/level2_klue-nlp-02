@@ -1,2 +1,20 @@
+# config 템플릿 (수정 X)
+name: 이름
+seed: 42
 train:
+  model_name: klue/bert-base
   epoch: 100
+  batch_size: 32
+  LR: 0.00001
+  loss: MSELoss
+  optim: AdamW
+  shuffle: True
+  model_max_len: 100
+  patience: 5
+  test_size: 0.2
+select_DC:
+  - method name
+select_DA:
+  - method name
+wandb:
+  id: 아이디

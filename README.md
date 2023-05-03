@@ -1,12 +1,13 @@
 # 문장 내 개체간 관계 추출
 
+- 팀명: 강남 특공대
 - 주제: 네이버 부스트캠프 ai tech 5기 | level 2 프로젝트
 - 프로젝트 기간: 2023년 5월 2일 ~ 2023년 5월 18일
 - 데이터셋
   - train data: 32,470개
   - test data: 7,765개
 - 평가 방법
-  - .
+  - `Micro F1 Score` `AUPRC`
 - 개발 스택: `Git` `Notion` `Ubuntu` `Python` `Pytorch Lightning` `Wandb`
 - 결과: 
 
@@ -54,11 +55,16 @@
 
 ```bash
 level2_klue-nlp-02/
-|-- READMD.md
+|-- README.md
 |-- config.yaml
+|-- data_analysis
 |-- dataset (private)
+|-- main_process.py
 |-- models
 |   `-- models.py
+|-- results (private)
+|-- use_config.yaml (private)
 `-- utils
+    |-- data_controller.py
     `-- utils.py
 ```

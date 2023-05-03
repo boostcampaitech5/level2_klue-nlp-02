@@ -10,6 +10,29 @@ dataset/*
 .viminfo
 .vscode-server/
 .wget-hsts
+.[^gitignore]*
+.gitconfig
+use_config.yaml
+results/
+
+### VisualStudioCode ###
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+
+# Local History for Visual Studio Code
+.history/
+
+# Built Visual Studio Code Extensions
+*.vsix
+
+### VisualStudioCode Patch ###
+# Ignore all local history of files
+.history
+.ionide
 
 ### JupyterNotebooks ###
 # gitignore template for Jupyter Notebooks
