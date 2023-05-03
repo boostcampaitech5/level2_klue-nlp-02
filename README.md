@@ -53,7 +53,7 @@
 
 # 2. 프로젝트 구조
 
-```bash
+```html
 level2_klue-nlp-02/
 |-- README.md
 |-- config.yaml
