@@ -58,6 +58,7 @@ level2_klue-nlp-02/
 |-- README.md
 |-- config.yaml
 |-- data_analysis
+|   `-- beom_pre.ipynb
 |-- dataset (private)
 |-- main_process.py
 |-- models
@@ -66,5 +67,6 @@ level2_klue-nlp-02/
 |-- use_config.yaml (private)
 `-- utils
     |-- data_controller.py
+    |-- metrics.py
     `-- utils.py
 ```
