@@ -72,5 +72,5 @@
 |   |-- main_process.py
 |   |-- requirements.txt
 |   `-- use_config.yaml (private)
-`
+`----------------------
 ```
