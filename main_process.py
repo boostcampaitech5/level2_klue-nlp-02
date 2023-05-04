@@ -1,13 +1,12 @@
 import yaml
-import torch
-import transformers
 import pandas as pd
 import pytorch_lightning as pl
 import wandb
+import pickle
 
 from models.models import Model
 from utils import utils, data_controller
-from transformers import AutoTokenizer, AutoModel
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.loggers import WandbLogger
@@ -27,14 +26,14 @@ if __name__ == "__main__":
     pl.seed_everything(CFG['seed'])
     # wandb 설정
     wandb.init(name=folder_name, project="level2", entity=CFG['wandb']['id'], dir=save_path)
-    wandb_logger = WandbLogger()
+    wandb_logger = WandbLogger(save_dir=save_path)
     wandb_logger.experiment.config.update(CFG)
 
     """---Train---"""
     # 데이터 로더와 모델 가져오기
     tokenizer = AutoTokenizer.from_pretrained(CFG['train']['model_name'])
     dataloader = data_controller.Dataloader(tokenizer, CFG)
-    LM = AutoModel.from_pretrained(pretrained_model_name_or_path=CFG['train']['model_name'], num_labels=30)
+    LM = AutoModelForSequenceClassification.from_pretrained(pretrained_model_name_or_path=CFG['train']['model_name'], num_labels=30)
     model = Model(LM, CFG)
     # check point
     checkpoint = ModelCheckpoint(monitor='val_loss',
@@ -55,10 +54,19 @@ if __name__ == "__main__":
                          callbacks = [checkpoint, early_stopping])
             
     trainer.fit(model=model, datamodule=dataloader)
-    trainer.test(model=model, datamodule=dataloader)
-
+    
     """---Inference---"""
-    preds_y, probs_y = trainer.predict(model=model, datamodule=dataloader)
+    predictions = trainer.predict(model=model, datamodule=dataloader)
+    
+    with open('./code/dict_num_to_label.pkl', 'rb') as f:
+        num2label = pickle.load(f)
+
+    pred_label, probs = [], []
+    for prediction in predictions:
+        for pred in prediction[0]:
+            pred_label.append(num2label[pred])
+        for prob in prediction[1]:
+            probs.append(prob)
 
     """---save---"""
     # write yaml
@@ -68,6 +76,6 @@ if __name__ == "__main__":
     # torch.save(model, f'{save_path}/{folder_name}_model.pt')
     # save submit
     submit = pd.read_csv('./code/prediction/sample_submission.csv')
-    submit['pred_label'] = preds_y
-    submit['probs'] = probs_y
+    submit['pred_label'] = pred_label
+    submit['probs'] = probs
     submit.to_csv(f'{save_path}/{folder_name}_submit.csv', index=False)

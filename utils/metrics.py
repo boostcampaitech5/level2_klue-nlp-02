@@ -46,18 +46,14 @@ def auprc(probs, labels):
     return np.average(score) * 100.0  # 배치 전체에 대해 계산했던 걸 다시 전체 평균
 
 
-def compute_metrics(outputs, y):
+def compute_metrics(probs, preds, y):
   """ validation을 위한 metrics function """
-  outputs = outputs.cpu()
   y = y.cpu()
-  labels = y
-  preds = outputs.argmax(-1)
-  probs = outputs
 
   # calculate accuracy using sklearn's function
-  f1 = micro_f1_score(preds, labels)
-#   aup = auprc(probs, labels)
-  acc = accuracy_score(labels, preds) # 리더보드 평가에는 포함되지 않습니다.
+  f1 = micro_f1_score(preds, y)
+  # aup = auprc(probs, y)
+  acc = accuracy_score(y, preds) # 리더보드 평가에는 포함되지 않습니다.
 
   return {
       'micro f1 score': f1,

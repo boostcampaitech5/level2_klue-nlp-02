@@ -17,7 +17,7 @@ class Dataset(Dataset):
 
     def __getitem__(self, idx):
         inputs = {key: val[idx].clone().detach() for key, val in self.inputs.items()}
-
+        
         if self.targets:
             targets = torch.tensor(self.targets[idx])
             
@@ -26,7 +26,7 @@ class Dataset(Dataset):
             return inputs
 
     def __len__(self):
-        return len(self.inputs)
+        return len(self.inputs['input_ids'])
 
 class Dataloader(pl.LightningDataModule):
     """
@@ -88,7 +88,7 @@ class Dataloader(pl.LightningDataModule):
         
         # 텍스트 데이터 토큰화
         inputs = self.tokenizing(x)
-
+        
         return inputs, targets
     
     def setup(self, stage='fit'):
@@ -96,12 +96,11 @@ class Dataloader(pl.LightningDataModule):
             # 학습 데이터 준비
             train_inputs, train_targets = self.preprocessing(self.train_x, self.train_y, train=True)
             self.train_dataset = Dataset(train_inputs, train_targets)
-
+            
             val_inputs, val_targets = self.preprocessing(self.val_x, self.val_y, train=True)
             self.val_dataset = Dataset(val_inputs, val_targets)
-            self.test_dataset = self.val_dataset
         else:
-            # 평가 데이터 호출
+            # 테스트 데이터 준비
             predict_inputs, predict_targets = self.preprocessing(self.predict_x)
             self.predict_dataset = Dataset(predict_inputs, predict_targets)
 
@@ -110,9 +109,6 @@ class Dataloader(pl.LightningDataModule):
     
     def val_dataloader(self):
         return DataLoader(self.val_dataset, batch_size=self.CFG['train']['batch_size'])
-    
-    def test_dataloader(self):
-        return DataLoader(self.test_dataset, batch_size=self.CFG['train']['batch_size'])
 
     def predict_dataloader(self):
         return DataLoader(self.predict_dataset, batch_size=self.CFG['train']['batch_size'])
@@ -126,9 +122,10 @@ class DataCleaning():
         self.select_list = select_list
     
     def process(self, df):
-        for method_name in self.select_list:
-            method = eval("self." + method_name)
-            df = method(df)
+        if self.select_list:
+            for method_name in self.select_list:
+                method = eval("self." + method_name)
+                df = method(df)
         
         return df
 
@@ -150,7 +147,11 @@ class DataCleaning():
             start_idx_list, end_idx_list = [], []
             
             for i in range(len(df)):
-                dictionary = eval(df.iloc[i][column])
+                try:
+                    dictionary = eval(df.iloc[i][column])
+                except:
+                    print(df.iloc[i])
+                    exit()
 
                 word_list.append(dictionary['word'])
                 start_idx_list.append(dictionary['start_idx'])
@@ -160,7 +161,7 @@ class DataCleaning():
             df[column] = word_list
             for key in ['start_idx', 'end_idx', 'type']:
                 df[f"{type_entity}_{key}"] = eval(f"{key}_list")
-        print(df.shape)
+        
         return df
 
 
@@ -172,13 +173,14 @@ class DataAugmentation():
         self.select_list = select_list
     
     def process(self, df):
-        aug_df = pd.DataFrame(columns=df.columns)
+        if self.select_list:
+            aug_df = pd.DataFrame(columns=df.columns)
 
-        for method_name in self.select_list:
-            method = eval("self." + method_name)
-            aug_df = pd.concat([aug_df, method(df)])
+            for method_name in self.select_list:
+                method = eval("self." + method_name)
+                aug_df = pd.concat([aug_df, method(df)])
 
-        df = pd.concat([df, aug_df])
+            df = pd.concat([df, aug_df])
         
         return df
     
