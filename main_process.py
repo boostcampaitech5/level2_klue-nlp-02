@@ -58,8 +58,7 @@ if __name__ == "__main__":
     trainer.test(model=model, datamodule=dataloader)
 
     """---Inference---"""
-    pred_y = trainer.predict(model=model, datamodule=dataloader)
-    pred_y = list(float(i) for i in torch.cat(pred_y))
+    preds_y, probs_y = trainer.predict(model=model, datamodule=dataloader)
 
     """---save---"""
     # write yaml
@@ -69,5 +68,6 @@ if __name__ == "__main__":
     # torch.save(model, f'{save_path}/{folder_name}_model.pt')
     # save submit
     submit = pd.read_csv('./code/prediction/sample_submission.csv')
-    
+    submit['pred_label'] = preds_y
+    submit['probs'] = probs_y
     submit.to_csv(f'{save_path}/{folder_name}_submit.csv', index=False)
