@@ -53,18 +53,24 @@
 
 # 2. 프로젝트 구조
 
-```bash
-level2_klue-nlp-02/
-|-- README.md
-|-- config.yaml
-|-- data_analysis
-|-- dataset (private)
-|-- main_process.py
-|-- models
-|   `-- models.py
-|-- results (private)
-|-- use_config.yaml (private)
-`-- utils
-    |-- data_controller.py
-    `-- utils.py
+```html
+|-- level2_klue-nlp-02/
+|   |-- code/ (private)
+|   |-- dataset/ (private)
+|   |-- results/ (private)
+|   |-- data_analysis/
+|   |   |-- {name}_pre.ipynb
+|   |   `-- {name}_viz.ipynb
+|   |-- models/
+|   |   `-- models.py
+|   |-- utils/
+|   |   |-- data_controller.py
+|   |   |-- metrics.py
+|   |   `-- utils.py
+|   |-- README.md
+|   |-- config.yaml
+|   |-- main_process.py
+|   |-- requirements.txt
+|   `-- use_config.yaml (private)
+`
 ```

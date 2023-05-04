@@ -9,12 +9,11 @@ train:
   loss: MSELoss
   optim: AdamW
   shuffle: True
-  model_max_len: 100
+  token_max_len: 100
   patience: 5
   test_size: 0.2
 select_DC:
-  - method name
+  - entity_parsing # 필수
 select_DA:
-  - method name
 wandb:
   id: 아이디
