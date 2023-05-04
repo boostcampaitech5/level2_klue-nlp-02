@@ -6,7 +6,7 @@ train:
   epoch: 100
   batch_size: 32
   LR: 0.00001
-  loss: MSELoss
+  loss: CrossEntropyLoss
   optim: AdamW
   shuffle: True
   token_max_len: 100
