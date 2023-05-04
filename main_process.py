@@ -7,7 +7,7 @@ import wandb
 
 from models.models import Model
 from utils import utils, data_controller
-from transformers import AutoTokenizer, AutoModel
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.loggers import WandbLogger
@@ -35,7 +35,7 @@ if __name__ == "__main__":
     # 데이터 로더와 모델 가져오기
     tokenizer = AutoTokenizer.from_pretrained(CFG['train']['model_name'])
     dataloader = data_controller.Dataloader(tokenizer, CFG)
-    LM = AutoModel.from_pretrained(
+    LM = AutoModelForSequenceClassification.from_pretrained(
         pretrained_model_name_or_path=CFG['train']['model_name'], num_labels=30)
     model = Model(LM, CFG)
     # check point
@@ -58,7 +58,6 @@ if __name__ == "__main__":
                          callbacks=[checkpoint, early_stopping])
 
     trainer.fit(model=model, datamodule=dataloader)
-    trainer.test(model=model, datamodule=dataloader)
 
     """---Inference---"""
     preds_y, probs_y = trainer.predict(model=model, datamodule=dataloader)

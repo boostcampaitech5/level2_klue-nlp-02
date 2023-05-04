@@ -14,18 +14,17 @@ class Model(pl.LightningModule):
 
         # 사용할 모델을 호출
         self.LM = LM  # Language Model
-        self.loss_func = eval("torch.nn." + self.CFG['train']['loss'])()
+        self.loss_func = eval("torch.nn." + self.CFG['train']['lossF'])()
         self.optim = eval("torch.optim." + self.CFG['train']['optim'])
 
     def forward(self, input_ids, attention_mask, token_type_ids):
-        outputs = self(
+        outputs = self.LM(
             input_ids=input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids
         )
-        pooled_output = outputs[1]  # [CLS] token에 대한 출력
-
-        return pooled_output
+        logits = outputs['logits']  # [CLS] token에 대한 출력
+        return F.softmax(logits, dim=-1)
 
     def training_step(self, batch, batch_idx):
         x, y = batch
@@ -34,7 +33,7 @@ class Model(pl.LightningModule):
             attention_mask=x['attention_mask'],
             token_type_ids=x['token_type_ids']
         )
-        loss = self.loss_func(outputs, y.float())
+        loss = self.loss_func(outputs, y)
         self.log("train_loss", loss)
 
         return loss
@@ -46,10 +45,10 @@ class Model(pl.LightningModule):
             attention_mask=x['attention_mask'],
             token_type_ids=x['token_type_ids']
         )
-        loss = self.loss_func(outputs, y.float())
+        loss = self.loss_func(outputs, y)
         self.log("val_loss", loss)
-
-        metric = metrics.compute_metrics(outputs, y)
+        breakpoint()
+        metric = metrics.compute_metrics(outputs.detach().cpu().numpy(), y.detach().cpu().numpy())
         self.log('val_micro_f1_Score', metric['micro f1 score'])
         self.log('val_AUPRC', metric['auprc'])
         self.log('val_acc', metric['accuracy'])

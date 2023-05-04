@@ -30,7 +30,7 @@ class Dataset(Dataset):
             return inputs
 
     def __len__(self):
-        return len(self.inputs)
+        return len(self.inputs['input_ids'])
 
 
 class Dataloader(pl.LightningDataModule):
@@ -42,10 +42,17 @@ class Dataloader(pl.LightningDataModule):
         super(Dataloader, self).__init__()
         self.CFG = CFG
         self.tokenizer = tokenizer
-        train_df, test_df, label2num, num2label = load_data()
-        self.train_df = train_df
-        self.val_df = None  # val == test
-        self.predict_df = test_df
+        train_x, train_y, predict_x, label2num, num2label = load_data()
+        train_x, val_x, train_y, val_y = train_test_split(train_x, train_y,
+                                                          stratify=train_y,
+                                                          test_size=self.CFG['train']['test_size'],
+                                                          shuffle=self.CFG['train']['shuffle'],
+                                                          random_state=self.CFG['seed'])
+        self.train_x = train_x
+        self.train_y = train_y
+        self.val_x = val_x
+        self.val_y = val_y
+        self.predict_x = predict_x
         self.label2num = label2num
         self.num2label = num2label
 
@@ -71,22 +78,20 @@ class Dataloader(pl.LightningDataModule):
 
         return inputs
 
-    def preprocessing(self, data, train=False):
+    def preprocessing(self, x, y, train=False):
         DC = DataCleaning(self.CFG['select_DC'])
         DA = DataAugmentation(self.CFG['select_DA'])
 
         # 그냥 process의 return 없애고 DC.process(data)만 쓰는 것은?
-        data = DC.process(data)
-        if train:  # train일 때만 augmentation을 합니다.
-            data = DA.process(data)
-        # label 설정
+        x = DC.process(x)
         if train:
-            targets = data['label'].apply(lambda x: self.label2num[x])
+            x = DA.process(x)
+            targets = [self.label2num[label] for label in y]
         else:
             targets = []
 
         # 텍스트 데이터 토큰화
-        inputs = pd.DataFrame(self.tokenizing(data))  # 뒤에 train_test_split을 위해
+        inputs = self.tokenizing(x)  # 뒤에 train_test_split을 위해
 
         return inputs, targets
 
@@ -94,13 +99,9 @@ class Dataloader(pl.LightningDataModule):
         if stage == 'fit':
             # 학습 데이터 준비
             train_inputs, train_targets = self.preprocessing(
-                self.train_df, train=True)
-            breakpoint()
-            train_inputs, val_inputs, train_targets, val_targets = train_test_split(train_inputs, train_targets,
-                                                                                    test_size=self.CFG['train']['test_size'],
-                                                                                    stratify=train_targets,
-                                                                                    random_state=self.CFG['seed'])
-
+                self.train_x, self.train_y, train=True)
+            val_inputs, val_targets = self.preprocessing(
+                self.val_x, self.val_y, train=True)  # train=True 맞나?
             self.train_dataset = Dataset(train_inputs, train_targets)
             self.val_dataset = Dataset(val_inputs, val_targets)
             self.test_dataset = self.val_dataset
@@ -111,16 +112,16 @@ class Dataloader(pl.LightningDataModule):
             self.predict_dataset = Dataset(predict_inputs, predict_targets)
 
     def train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=self.shuffle)
+        return DataLoader(self.train_dataset, batch_size=self.CFG['train']['batch_size'], shuffle=self.CFG['train']['shuffle'])
 
     def val_dataloader(self):
-        return DataLoader(self.val_dataset, batch_size=self.batch_size)
+        return DataLoader(self.val_dataset, batch_size=self.CFG['train']['batch_size'])
 
     def test_dataloader(self):
-        return DataLoader(self.test_dataset, batch_size=self.batch_size)
+        return DataLoader(self.test_dataset, batch_size=self.CFG['train']['batch_size'])
 
     def predict_dataloader(self):
-        return DataLoader(self.predict_dataset, batch_size=self.batch_size)
+        return DataLoader(self.predict_dataset, batch_size=self.CFG['train']['batch_size'])
 
 
 class DataCleaning():
@@ -203,15 +204,17 @@ def load_data():
     """
     train_df = pd.read_csv('./dataset/train/train.csv')
     train_df.drop(['id', 'source'], axis=1, inplace=True)
-    test_df = pd.read_csv('./dataset/test/test_data.csv')
-    test_df.drop(['id', 'source'], axis=1, inplace=True)
+    train_x = train_df.drop(['label'], axis=1)
+    train_y = train_df['label']
+    test_x = pd.read_csv('./dataset/test/test_data.csv')
+    test_x.drop(['id', 'source'], axis=1, inplace=True)
 
     with open('./code/dict_label_to_num.pkl', 'rb') as f:
         label2num = pickle.load(f)
     with open('./code/dict_num_to_label.pkl', 'rb') as f:
         num2label = pickle.load(f)
 
-    return train_df, test_df, label2num, num2label
+    return train_x, train_y, test_x, label2num, num2label
 
 
 if __name__ == "__main__":
