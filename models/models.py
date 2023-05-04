@@ -3,28 +3,28 @@ import numpy as np
 import torch.nn.functional as F
 import pytorch_lightning as pl
 
-from ..utils import metrics
+from utils import metrics
+
 
 class Model(pl.LightningModule):
     def __init__(self, LM, CFG):
         super().__init__()
         self.save_hyperparameters()
         self.CFG = CFG
-        
+
         # 사용할 모델을 호출
-        self.LM = LM # Language Model
-        self.loss_func = eval("torch.nn." + self.CFG['train']['LossF'])()
+        self.LM = LM  # Language Model
+        self.loss_func = eval("torch.nn." + self.CFG['train']['lossF'])()
         self.optim = eval("torch.optim." + self.CFG['train']['optim'])
 
-    def forward(self, input_ids, attention_mask, token_type_ids): 
-        outputs = self(
+    def forward(self, input_ids, attention_mask, token_type_ids):
+        outputs = self.LM(
             input_ids=input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids
         )
-        pooled_output = outputs[1] # [CLS] token에 대한 출력
-
-        return pooled_output
+        logits = outputs['logits']  # [CLS] token에 대한 출력
+        return logits
 
     def training_step(self, batch, batch_idx):
         x, y = batch
@@ -33,7 +33,7 @@ class Model(pl.LightningModule):
             attention_mask=x['attention_mask'],
             token_type_ids=x['token_type_ids']
         )
-        loss = self.loss_func(outputs, y.float())
+        loss = self.loss_func(outputs, y)
         self.log("train_loss", loss)
 
         return loss
@@ -45,10 +45,10 @@ class Model(pl.LightningModule):
             attention_mask=x['attention_mask'],
             token_type_ids=x['token_type_ids']
         )
-        loss = self.loss_func(outputs, y.float())
+        loss = self.loss_func(outputs, y)
         self.log("val_loss", loss)
-
-        metric = metrics.compute_metrics(outputs, y)
+        metric = metrics.compute_metrics(
+            F.softmax(outputs, dim=-1), y)
         self.log('val_micro_f1_Score', metric['micro f1 score'])
         self.log('val_AUPRC', metric['auprc'])
         self.log('val_acc', metric['accuracy'])
@@ -63,7 +63,8 @@ class Model(pl.LightningModule):
             token_type_ids=x['token_type_ids']
         )
 
-        metric = metrics.compute_metrics(outputs, y)
+        metric = metrics.compute_metrics(
+            F.softmax(outputs, dim=-1), y)
         self.log('test_micro_f1_Score', metric['micro f1 score'])
         self.log('test_AUPRC', metric['auprc'])
         self.log('test_acc', metric['accuracy'])
@@ -75,10 +76,8 @@ class Model(pl.LightningModule):
             attention_mask=x['attention_mask'],
             token_type_ids=x['token_type_ids']
         )
-        logits = outputs[0]
-        probs = F.softmax(logits, dim=-1).detach().cpu().numpy()
-        logits = logits.detach().cpu().numpy()
-        preds = np.argmax(logits, axis=-1)
+        probs = F.softmax(outputs, dim=-1).detach().cpu().numpy()
+        preds = np.argmax(outputs.detach().cpu().numpy(), axis=-1)
 
         return preds, probs
 
@@ -96,8 +95,8 @@ class Model(pl.LightningModule):
             verbose=True)
 
         lr_scheduler = {
-        'scheduler': scheduler,
-        'name': 'LR_schedule'
+            'scheduler': scheduler,
+            'name': 'LR_schedule'
         }
 
-        return [optimizer]#, [lr_scheduler]
+        return [optimizer]  # , [lr_scheduler]
