@@ -24,7 +24,7 @@ class Model(pl.LightningModule):
             token_type_ids=token_type_ids
         )
         logits = outputs['logits']  # [CLS] token에 대한 출력
-        return F.softmax(logits, dim=-1)
+        return logits
 
     def training_step(self, batch, batch_idx):
         x, y = batch
@@ -47,8 +47,8 @@ class Model(pl.LightningModule):
         )
         loss = self.loss_func(outputs, y)
         self.log("val_loss", loss)
-        breakpoint()
-        metric = metrics.compute_metrics(outputs.detach().cpu().numpy(), y.detach().cpu().numpy())
+        metric = metrics.compute_metrics(
+            F.softmax(outputs, dim=-1), y)
         self.log('val_micro_f1_Score', metric['micro f1 score'])
         self.log('val_AUPRC', metric['auprc'])
         self.log('val_acc', metric['accuracy'])
@@ -63,7 +63,8 @@ class Model(pl.LightningModule):
             token_type_ids=x['token_type_ids']
         )
 
-        metric = metrics.compute_metrics(outputs, y)
+        metric = metrics.compute_metrics(
+            F.softmax(outputs, dim=-1), y)
         self.log('test_micro_f1_Score', metric['micro f1 score'])
         self.log('test_AUPRC', metric['auprc'])
         self.log('test_acc', metric['accuracy'])

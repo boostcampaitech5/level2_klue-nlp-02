@@ -4,7 +4,7 @@ import sklearn
 from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
 
 
-def micro_f1_score(preds, labels):
+def klue_re_micro_f1(preds, labels):
     label_list = ['no_relation', 'org:top_members/employees', 'org:members',
                   'org:product', 'per:title', 'org:alternate_names',
                   'per:employee_of', 'org:place_of_headquarters', 'per:product',
@@ -20,14 +20,11 @@ def micro_f1_score(preds, labels):
     no_relation_label_idx = label_list.index("no_relation")
     label_indices = list(range(len(label_list)))     # print : [0,1, ..., 29]
     label_indices.remove(no_relation_label_idx)     # print : [1, ..., 29]
-    f1_score = sklearn.metrics.f1_score(
-        labels, preds, average="micro", labels=label_indices)
-    f1_score *= 100.0    # 확률로 바꿔주기 위한 100 곱셈
 
-    return f1_score
+    return sklearn.metrics.f1_score(labels, preds, average="micro", labels=label_indices) * 100.0
 
 
-def auprc_score(probs, labels):
+def klue_re_auprc(probs, labels):
     """ KLUE-RE AUPRC
       args:
         probs:  (batch, num_labels)
@@ -56,13 +53,13 @@ def auprc_score(probs, labels):
 
 def compute_metrics(outputs, y):
     """ validation을 위한 metrics function """
-    labels = y
-    preds = outputs.argmax(-1)
-    probs = torch.nn.functional.softmax(outputs, dim=1)   # (batch, num_labels)
+    labels = y.cpu().detach().numpy()
+    preds = outputs.cpu().detach().numpy().argmax(-1)
+    probs = outputs.cpu().detach().numpy()   # (batch, num_labels)
 
     # calculate accuracy using sklearn's function
-    f1 = micro_f1_score(preds, labels)
-    auprc = auprc_score(probs, labels)
+    f1 = klue_re_micro_f1(preds, labels)
+    auprc = klue_re_auprc(probs, labels)
     acc = accuracy_score(labels, preds)  # 리더보드 평가에는 포함되지 않습니다.
 
     return {
