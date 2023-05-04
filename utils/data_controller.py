@@ -78,11 +78,10 @@ class Dataloader(pl.LightningDataModule):
         DA = DataAugmentation(self.CFG['select_DA'])
 
         x = DC.process(x)
-        if train: # train일 때만 augmentation을 합니다.
-            x = DA.process(x)
         
         # label 설정
         if train:
+            x = DA.process(x)
             targets = [self.label2num[label] for label in y]
         else:
             targets = []
@@ -127,10 +126,9 @@ class DataCleaning():
         self.select_list = select_list
     
     def process(self, df):
-        if self.select_list:
-            for method_name in self.select_list:
-                method = eval("self." + method_name)
-                df = method(df)
+        for method_name in self.select_list:
+            method = eval("self." + method_name)
+            df = method(df)
         
         return df
 
@@ -162,7 +160,7 @@ class DataCleaning():
             df[column] = word_list
             for key in ['start_idx', 'end_idx', 'type']:
                 df[f"{type_entity}_{key}"] = eval(f"{key}_list")
-        
+        print(df.shape)
         return df
 
 
@@ -174,14 +172,13 @@ class DataAugmentation():
         self.select_list = select_list
     
     def process(self, df):
-        if self.select_list:
-            aug_df = pd.DataFrame(columns=df.columns)
+        aug_df = pd.DataFrame(columns=df.columns)
 
-            for method_name in self.select_list:
-                method = eval("self." + method_name)
-                aug_df = pd.concat([aug_df, method(df)])
+        for method_name in self.select_list:
+            method = eval("self." + method_name)
+            aug_df = pd.concat([aug_df, method(df)])
 
-            df = pd.concat([df, aug_df])
+        df = pd.concat([df, aug_df])
         
         return df
     

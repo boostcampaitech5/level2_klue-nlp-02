@@ -14,6 +14,7 @@ dataset/*
 .gitconfig
 use_config.yaml
 results/
+.netrc
 
 ### VisualStudioCode ###
 .vscode/*

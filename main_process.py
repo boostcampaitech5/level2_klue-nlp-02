@@ -26,8 +26,8 @@ if __name__ == "__main__":
     # seed 설정
     pl.seed_everything(CFG['seed'])
     # wandb 설정
-    wandb.init(name=folder_name, project="level2", entity=CFG['wandb']['id'])
-    wandb_logger = WandbLogger(name=folder_name, save_dir=save_path)
+    wandb.init(name=folder_name, project="level2", entity=CFG['wandb']['id'], dir=save_path)
+    wandb_logger = WandbLogger()
     wandb_logger.experiment.config.update(CFG)
 
     """---Train---"""
