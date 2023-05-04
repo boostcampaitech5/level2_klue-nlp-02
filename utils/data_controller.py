@@ -6,22 +6,25 @@ import pytorch_lightning as pl
 from sklearn.model_selection import train_test_split
 from tqdm.auto import tqdm
 from torch.utils.data import Dataset, DataLoader
-from utils.process_manipulator import SequentialCleaning as SC, SequentialAugmentation as SA
+# from utils.process_manipulator import SequentialCleaning as SC, SequentialAugmentation as SA
+
 
 class Dataset(Dataset):
     """
     Dataloader에서 불러온 데이터를 Dataset으로 만들기
     """
+
     def __init__(self, inputs, targets=[]):
         self.inputs = inputs
         self.targets = targets
 
     def __getitem__(self, idx):
-        inputs = {key: val[idx].clone().detach() for key, val in self.inputs.items()}
+        inputs = {key: val[idx].clone().detach()
+                  for key, val in self.inputs.items()}
 
         if self.targets:
             targets = torch.tensor(self.targets[idx])
-            
+
             return inputs, targets
         else:
             return inputs
@@ -29,32 +32,33 @@ class Dataset(Dataset):
     def __len__(self):
         return len(self.inputs)
 
+
 class Dataloader(pl.LightningDataModule):
     """
     원본 데이터를 불러와 전처리 후 Dataloader 만들어 Dataset에 넘겨 최종적으로 사용할 데이터셋 만들기
     """
+
     def __init__(self, tokenizer, CFG):
         super(Dataloader, self).__init__()
         self.CFG = CFG
         self.tokenizer = tokenizer
-        
         train_df, test_df, label2num, num2label = load_data()
         self.train_df = train_df
-        self.val_df = None # val == test
+        self.val_df = None  # val == test
         self.predict_df = test_df
         self.label2num = label2num
         self.num2label = num2label
 
         self.train_dataset = None
-        self.val_dataset = None # val == test
+        self.val_dataset = None  # val == test
         self.test_dataset = None
-        self.predict_dataset = None 
+        self.predict_dataset = None
 
     def tokenizing(self, df):
         concat_entity = []
         for sub_ent, obj_ent in zip(df['subject_entity'], df['object_entity']):
             concat_entity.append(obj_ent + " [SEP] " + sub_ent)
-        
+
         inputs = self.tokenizer(
             concat_entity,
             list(df['sentence']),
@@ -64,33 +68,34 @@ class Dataloader(pl.LightningDataModule):
             max_length=self.CFG['train']['token_max_len'],
             add_special_tokens=True,
         )
-        
+
         return inputs
 
     def preprocessing(self, data, train=False):
         DC = DataCleaning(self.CFG['select_DC'])
         DA = DataAugmentation(self.CFG['select_DA'])
 
+        # 그냥 process의 return 없애고 DC.process(data)만 쓰는 것은?
         data = DC.process(data)
-        if train: # train일 때만 augmentation을 합니다.
+        if train:  # train일 때만 augmentation을 합니다.
             data = DA.process(data)
-        
         # label 설정
         if train:
             targets = data['label'].apply(lambda x: self.label2num[x])
         else:
             targets = []
-        
+
         # 텍스트 데이터 토큰화
-        inputs = self.tokenizing(data)
+        inputs = pd.DataFrame(self.tokenizing(data))  # 뒤에 train_test_split을 위해
 
         return inputs, targets
-    
+
     def setup(self, stage='fit'):
         if stage == 'fit':
             # 학습 데이터 준비
-            train_inputs, train_targets = self.preprocessing(self.train_df, train=True)
-            
+            train_inputs, train_targets = self.preprocessing(
+                self.train_df, train=True)
+            breakpoint()
             train_inputs, val_inputs, train_targets, val_targets = train_test_split(train_inputs, train_targets,
                                                                                     test_size=self.CFG['train']['test_size'],
                                                                                     stratify=train_targets,
@@ -101,15 +106,16 @@ class Dataloader(pl.LightningDataModule):
             self.test_dataset = self.val_dataset
         else:
             # 평가 데이터 호출
-            predict_inputs, predict_targets = self.preprocessing(self.predict_df)
+            predict_inputs, predict_targets = self.preprocessing(
+                self.predict_df)
             self.predict_dataset = Dataset(predict_inputs, predict_targets)
 
     def train_dataloader(self):
         return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=self.shuffle)
-    
+
     def val_dataloader(self):
         return DataLoader(self.val_dataset, batch_size=self.batch_size)
-    
+
     def test_dataloader(self):
         return DataLoader(self.test_dataset, batch_size=self.batch_size)
 
@@ -121,20 +127,22 @@ class DataCleaning():
     """
     config select DC에 명시된 Data Cleaning 기법을 적용시켜주는 클래스
     """
+
     def __init__(self, select_list):
         self.select_list = select_list
-    
-    def process(self, df):
+
+    def process(self, df):  # tqdm 써볼까? 생각보다 오래걸리네용,,
         if self.select_list:
             for method_name in self.select_list:
                 method = eval("self." + method_name)
                 df = method(df)
-        
+
         return df
 
     """
     data cleaning 코드
     """
+
     def entity_parsing(self, df):
         """
         entity에서 word, start_idx, end_idx, type 분리하기
@@ -148,7 +156,7 @@ class DataCleaning():
 
             word_list, type_list = [], []
             start_idx_list, end_idx_list = [], []
-            
+
             for i in range(len(df)):
                 dictionary = eval(df.iloc[i][column])
 
@@ -156,19 +164,22 @@ class DataCleaning():
                 start_idx_list.append(dictionary['start_idx'])
                 end_idx_list.append(dictionary['end_idx'])
                 type_list.append(dictionary['type'])
-            
+
             df[column] = word_list
             for key in ['start_idx', 'end_idx', 'type']:
                 df[f"{type_entity}_{key}"] = eval(f"{key}_list")
+
+        return df
 
 
 class DataAugmentation():
     """
     config select DA에 명시된 Data Augmentation 기법을 적용시켜주는 클래스
     """
+
     def __init__(self, select_list):
         self.select_list = select_list
-    
+
     def process(self, df):
         if self.select_list:
             aug_df = pd.DataFrame(columns=df.columns)
@@ -178,9 +189,9 @@ class DataAugmentation():
                 aug_df = pd.concat([aug_df, method(df)])
 
             df = pd.concat([df, aug_df])
-        
+
         return df
-    
+
     """
     data augmentation 코드
     """
