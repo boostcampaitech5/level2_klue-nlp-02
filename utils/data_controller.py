@@ -6,7 +6,6 @@ import pytorch_lightning as pl
 from sklearn.model_selection import train_test_split
 from tqdm.auto import tqdm
 from torch.utils.data import Dataset, DataLoader
-from utils.process_manipulator import SequentialCleaning as SC, SequentialAugmentation as SA
 
 class Dataset(Dataset):
     """
@@ -38,10 +37,17 @@ class Dataloader(pl.LightningDataModule):
         self.CFG = CFG
         self.tokenizer = tokenizer
         
-        train_df, test_df, label2num, num2label = load_data()
-        self.train_df = train_df
-        self.val_df = None # val == test
-        self.predict_df = test_df
+        train_x, train_y, predict_x, label2num, num2label = load_data()
+        train_x, val_x, train_y, val_y = train_test_split(train_x, train_y,
+                                                          stratify=train_y,
+                                                          test_size=self.CFG['train']['test_size'],
+                                                          shuffle=self.CFG['train']['shuffle'],
+                                                          random_state=self.CFG['seed'])
+        self.train_x = train_x
+        self.train_y = train_y
+        self.val_x = val_x
+        self.val_y = val_y
+        self.predict_x = predict_x
         self.label2num = label2num
         self.num2label = num2label
 
@@ -50,14 +56,14 @@ class Dataloader(pl.LightningDataModule):
         self.test_dataset = None
         self.predict_dataset = None 
 
-    def tokenizing(self, df):
+    def tokenizing(self, x):
         concat_entity = []
-        for sub_ent, obj_ent in zip(df['subject_entity'], df['object_entity']):
+        for sub_ent, obj_ent in zip(x['subject_entity'], x['object_entity']):
             concat_entity.append(obj_ent + " [SEP] " + sub_ent)
         
         inputs = self.tokenizer(
             concat_entity,
-            list(df['sentence']),
+            list(x['sentence']),
             return_tensors='pt',
             padding=True,
             truncation=True,
@@ -67,54 +73,50 @@ class Dataloader(pl.LightningDataModule):
         
         return inputs
 
-    def preprocessing(self, data, train=False):
+    def preprocessing(self, x, y=[], train=False):
         DC = DataCleaning(self.CFG['select_DC'])
         DA = DataAugmentation(self.CFG['select_DA'])
 
-        data = DC.process(data)
+        x = DC.process(x)
         if train: # train일 때만 augmentation을 합니다.
-            data = DA.process(data)
+            x = DA.process(x)
         
         # label 설정
         if train:
-            targets = data['label'].apply(lambda x: self.label2num[x])
+            targets = [self.label2num[label] for label in y]
         else:
             targets = []
         
         # 텍스트 데이터 토큰화
-        inputs = self.tokenizing(data)
+        inputs = self.tokenizing(x)
 
         return inputs, targets
     
     def setup(self, stage='fit'):
         if stage == 'fit':
             # 학습 데이터 준비
-            train_inputs, train_targets = self.preprocessing(self.train_df, train=True)
-            
-            train_inputs, val_inputs, train_targets, val_targets = train_test_split(train_inputs, train_targets,
-                                                                                    test_size=self.CFG['train']['test_size'],
-                                                                                    stratify=train_targets,
-                                                                                    random_state=self.CFG['seed'])
-
+            train_inputs, train_targets = self.preprocessing(self.train_x, self.train_y, train=True)
             self.train_dataset = Dataset(train_inputs, train_targets)
+
+            val_inputs, val_targets = self.preprocessing(self.val_x, self.val_y, train=True)
             self.val_dataset = Dataset(val_inputs, val_targets)
             self.test_dataset = self.val_dataset
         else:
             # 평가 데이터 호출
-            predict_inputs, predict_targets = self.preprocessing(self.predict_df)
+            predict_inputs, predict_targets = self.preprocessing(self.predict_x)
             self.predict_dataset = Dataset(predict_inputs, predict_targets)
 
     def train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=self.shuffle)
+        return DataLoader(self.train_dataset, batch_size=self.CFG['train']['batch_size'], shuffle=self.CFG['train']['shuffle'])
     
     def val_dataloader(self):
-        return DataLoader(self.val_dataset, batch_size=self.batch_size)
+        return DataLoader(self.val_dataset, batch_size=self.CFG['train']['batch_size'])
     
     def test_dataloader(self):
-        return DataLoader(self.test_dataset, batch_size=self.batch_size)
+        return DataLoader(self.test_dataset, batch_size=self.CFG['train']['batch_size'])
 
     def predict_dataloader(self):
-        return DataLoader(self.predict_dataset, batch_size=self.batch_size)
+        return DataLoader(self.predict_dataset, batch_size=self.CFG['train']['batch_size'])
 
 
 class DataCleaning():
@@ -160,6 +162,8 @@ class DataCleaning():
             df[column] = word_list
             for key in ['start_idx', 'end_idx', 'type']:
                 df[f"{type_entity}_{key}"] = eval(f"{key}_list")
+        
+        return df
 
 
 class DataAugmentation():
@@ -192,15 +196,17 @@ def load_data():
     """
     train_df = pd.read_csv('./dataset/train/train.csv')
     train_df.drop(['id', 'source'], axis=1, inplace=True)
-    test_df = pd.read_csv('./dataset/test/test_data.csv')
-    test_df.drop(['id', 'source'], axis=1, inplace=True)
+    train_x = train_df.drop(['label'], axis=1)
+    train_y = train_df['label']
+    test_x = pd.read_csv('./dataset/test/test_data.csv')
+    test_x.drop(['id', 'source'], axis=1, inplace=True)
 
     with open('./code/dict_label_to_num.pkl', 'rb') as f:
         label2num = pickle.load(f)
     with open('./code/dict_num_to_label.pkl', 'rb') as f:
         num2label = pickle.load(f)
-
-    return train_df, test_df, label2num, num2label
+    
+    return train_x, train_y, test_x, label2num, num2label
 
 
 if __name__ == "__main__":

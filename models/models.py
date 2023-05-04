@@ -3,7 +3,9 @@ import numpy as np
 import torch.nn.functional as F
 import pytorch_lightning as pl
 
-from ..utils import metrics
+# import sys
+# sys.path.append("/opt/ml/utils")
+from utils import metrics
 
 class Model(pl.LightningModule):
     def __init__(self, LM, CFG):
@@ -13,11 +15,11 @@ class Model(pl.LightningModule):
         
         # 사용할 모델을 호출
         self.LM = LM # Language Model
-        self.loss_func = eval("torch.nn." + self.CFG['train']['LossF'])()
+        self.loss_func = eval("torch.nn." + self.CFG['train']['lossF'])()
         self.optim = eval("torch.optim." + self.CFG['train']['optim'])
 
     def forward(self, input_ids, attention_mask, token_type_ids): 
-        outputs = self(
+        outputs = self.LM(
             input_ids=input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids
@@ -33,7 +35,7 @@ class Model(pl.LightningModule):
             attention_mask=x['attention_mask'],
             token_type_ids=x['token_type_ids']
         )
-        loss = self.loss_func(outputs, y.float())
+        loss = self.loss_func(outputs, y)
         self.log("train_loss", loss)
 
         return loss
@@ -45,7 +47,7 @@ class Model(pl.LightningModule):
             attention_mask=x['attention_mask'],
             token_type_ids=x['token_type_ids']
         )
-        loss = self.loss_func(outputs, y.float())
+        loss = self.loss_func(outputs, y)
         self.log("val_loss", loss)
 
         metric = metrics.compute_metrics(outputs, y)

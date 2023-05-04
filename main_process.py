@@ -22,12 +22,12 @@ if __name__ == "__main__":
     with open('./use_config.yaml') as f:
         CFG = yaml.load(f, Loader=yaml.FullLoader)
     # 실험 결과 파일 생성 및 폴더명 가져오기
-    folder_name, save_path = utils.get_folder_name()
+    folder_name, save_path = utils.get_folder_name(CFG)
     # seed 설정
     pl.seed_everything(CFG['seed'])
     # wandb 설정
     wandb.init(name=folder_name, project="level2", entity=CFG['wandb']['id'])
-    wandb_logger = WandbLogger(save_dir=save_path)
+    wandb_logger = WandbLogger(name=folder_name, save_dir=save_path)
     wandb_logger.experiment.config.update(CFG)
 
     """---Train---"""
@@ -45,7 +45,7 @@ if __name__ == "__main__":
                                 filename='{epoch}-{val_loss:.4f}',
                                 mode='min')
     # Earlystopping
-    early_stopping = EarlyStopping(monitor='val_loss', patience=CFG['patience'], mode='min')
+    early_stopping = EarlyStopping(monitor='val_loss', patience=CFG['train']['patience'], mode='min')
     # fit
     trainer = pl.Trainer(accelerator='gpu',
                          max_epochs=CFG['train']['epoch'],

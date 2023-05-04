@@ -18,10 +18,10 @@ def micro_f1_score(preds, labels):
     no_relation_label_idx = label_list.index("no_relation")  # print : 0   / no relation은 계산에서 제외한다.
     label_indices = list(range(len(label_list)))     # print : [0,1, ..., 29]
     label_indices.remove(no_relation_label_idx)     # print : [1, ..., 29]
-    f1_score = sklearn.metrics.f1_score(labels, preds, average="micro", labels=label_indices)
-    f1_score *= 100.0    # 확률로 바꿔주기 위한 100 곱셈
+    f1 = f1_score(labels, preds, average="micro", labels=label_indices)
+    f1 *= 100.0    # 확률로 바꿔주기 위한 100 곱셈
 
-    return f1_score
+    return f1
 
 def auprc(preds, labels):
     pass
@@ -29,8 +29,10 @@ def auprc(preds, labels):
 
 
 
-def compute_metrics(outputs,y):
+def compute_metrics(outputs, y):
   """ validation을 위한 metrics function """
+  outputs = outputs.cpu()
+  y = y.cpu()
   labels = y
   preds = outputs.argmax(-1)
   probs = outputs
