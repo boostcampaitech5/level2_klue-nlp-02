@@ -3,6 +3,7 @@ import os
 from datetime import datetime, timezone, timedelta
 from glob import glob
 
+
 def get_folder_name(CFG):
     """
     실험 결과를 기록하기 위해 초 단위 날짜 정보를 고유 키로 선정
@@ -22,9 +23,9 @@ def get_best_check_point(save_path):
     """
     check_point_list = glob(f'{save_path}/*/*/*/epoch*')
     check_point_list.sort(reverse=True)
-    
+
     last_check_point = check_point_list[0]
-    
+
     return last_check_point
 
 

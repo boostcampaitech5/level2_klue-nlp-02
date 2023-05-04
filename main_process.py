@@ -25,34 +25,37 @@ if __name__ == "__main__":
     # seed 설정
     pl.seed_everything(CFG['seed'])
     # wandb 설정
-    wandb.init(name=folder_name, project="level2", entity=CFG['wandb']['id'], dir=save_path)
-    wandb_logger = WandbLogger(save_dir=save_path)
+    wandb_logger = wandb.init(
+        name=folder_name, project="level2", entity=CFG['wandb']['id'], dir=save_path)
+    wandb_logger = WandbLogger()
     wandb_logger.experiment.config.update(CFG)
 
     """---Train---"""
     # 데이터 로더와 모델 가져오기
     tokenizer = AutoTokenizer.from_pretrained(CFG['train']['model_name'])
     dataloader = data_controller.Dataloader(tokenizer, CFG)
-    LM = AutoModelForSequenceClassification.from_pretrained(pretrained_model_name_or_path=CFG['train']['model_name'], num_labels=30)
+    LM = AutoModelForSequenceClassification.from_pretrained(
+        pretrained_model_name_or_path=CFG['train']['model_name'], num_labels=30)
     model = Model(LM, CFG)
     # check point
     checkpoint = ModelCheckpoint(monitor='val_loss',
-                                save_top_k=3,
-                                save_last=True,
-                                save_weights_only=True,
-                                verbose=False,
-                                filename='{epoch}-{val_loss:.4f}',
-                                mode='min')
+                                 save_top_k=3,
+                                 save_last=True,
+                                 save_weights_only=True,
+                                 verbose=False,
+                                 filename='{epoch}-{val_loss:.4f}',
+                                 mode='min')
     # Earlystopping
-    early_stopping = EarlyStopping(monitor='val_loss', patience=CFG['train']['patience'], mode='min')
+    early_stopping = EarlyStopping(
+        monitor='val_loss', patience=CFG['train']['patience'], mode='min')
     # fit
     trainer = pl.Trainer(accelerator='gpu',
                          max_epochs=CFG['train']['epoch'],
                          default_root_dir=save_path,
                          log_every_n_steps=1,
-                         logger = wandb_logger,
-                         callbacks = [checkpoint, early_stopping])
-            
+                         logger=wandb_logger,
+                         callbacks=[checkpoint, early_stopping])
+
     trainer.fit(model=model, datamodule=dataloader)
     
     """---Inference---"""

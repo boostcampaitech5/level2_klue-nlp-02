@@ -10,7 +10,7 @@ class Model(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
         self.CFG = CFG
-        
+
         # 사용할 모델을 호출
         self.LM = LM # Language Model
         self.loss_func = eval("torch.nn." + self.CFG['train']['lossF'])()
@@ -43,14 +43,11 @@ class Model(pl.LightningModule):
             input_ids=x['input_ids'],
             attention_mask=x['attention_mask'],
             token_type_ids=x['token_type_ids']
-        )        
+        )
         loss = self.loss_func(logits, y)
         self.log("val_loss", loss)
-
-        probs = F.softmax(logits, dim=-1).cpu()
-        preds = np.argmax(probs, axis=-1)
-        
-        metric = metrics.compute_metrics(probs, preds, y)
+        metric = metrics.compute_metrics(
+            F.softmax(logits, dim=-1), y)
         self.log('val_micro_f1_Score', metric['micro f1 score'])
         self.log('val_AUPRC', metric['auprc'])
         self.log('val_acc', metric['accuracy'])
@@ -83,8 +80,8 @@ class Model(pl.LightningModule):
             verbose=True)
 
         lr_scheduler = {
-        'scheduler': scheduler,
-        'name': 'LR_schedule'
+            'scheduler': scheduler,
+            'name': 'LR_schedule'
         }
 
-        return [optimizer]#, [lr_scheduler]
+        return [optimizer]  # , [lr_scheduler]
