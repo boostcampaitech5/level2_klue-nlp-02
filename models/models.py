@@ -76,10 +76,8 @@ class Model(pl.LightningModule):
             attention_mask=x['attention_mask'],
             token_type_ids=x['token_type_ids']
         )
-        logits = outputs[0]
-        probs = F.softmax(logits, dim=-1).detach().cpu().numpy()
-        logits = logits.detach().cpu().numpy()
-        preds = np.argmax(logits, axis=-1)
+        probs = F.softmax(outputs, dim=-1).detach().cpu().numpy()
+        preds = np.argmax(outputs.detach().cpu().numpy(), axis=-1)
 
         return preds, probs
 
