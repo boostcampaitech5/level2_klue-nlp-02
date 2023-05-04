@@ -1,7 +1,5 @@
 import numpy as np
-import torch
-import sklearn
-from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
+from sklearn.metrics import accuracy_score, f1_score, precision_recall_curve, auc
 
 
 def klue_re_micro_f1(preds, labels):
@@ -20,8 +18,10 @@ def klue_re_micro_f1(preds, labels):
     no_relation_label_idx = label_list.index("no_relation")
     label_indices = list(range(len(label_list)))     # print : [0,1, ..., 29]
     label_indices.remove(no_relation_label_idx)     # print : [1, ..., 29]
+    f1 = f1_score(labels, preds, average="micro", labels=label_indices)
+    f1 *= 100.0    # 확률로 바꿔주기 위한 100 곱셈
 
-    return sklearn.metrics.f1_score(labels, preds, average="micro", labels=label_indices) * 100.0
+    return f1
 
 
 def klue_re_auprc(probs, labels):
@@ -43,10 +43,10 @@ def klue_re_auprc(probs, labels):
         # axis=1, c 번째 column을 가져와서 1차원 array로 만듦(ravel). 사이즈 = (batch, )
         targets_c = labels.take([c], axis=1).ravel()
         preds_c = probs.take([c], axis=1).ravel()
-        precision, recall, _ = sklearn.metrics.precision_recall_curve(
+        precision, recall, _ = precision_recall_curve(
             targets_c, preds_c)   # 배치 전체에 대한 계산 metric
         # 라벨 c 에 대해서 batch 전체를 가지고 auc 계산.
-        score[c] = sklearn.metrics.auc(recall, precision)
+        score[c] = auc(recall, precision)
 
     return np.average(score) * 100.0  # 배치 전체에 대해 계산했던 걸 다시 전체 평균
 

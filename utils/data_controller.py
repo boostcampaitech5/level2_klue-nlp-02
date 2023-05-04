@@ -6,8 +6,6 @@ import pytorch_lightning as pl
 from sklearn.model_selection import train_test_split
 from tqdm.auto import tqdm
 from torch.utils.data import Dataset, DataLoader
-# from utils.process_manipulator import SequentialCleaning as SC, SequentialAugmentation as SA
-
 
 class Dataset(Dataset):
     """
@@ -42,6 +40,7 @@ class Dataloader(pl.LightningDataModule):
         super(Dataloader, self).__init__()
         self.CFG = CFG
         self.tokenizer = tokenizer
+        
         train_x, train_y, predict_x, label2num, num2label = load_data()
         train_x, val_x, train_y, val_y = train_test_split(train_x, train_y,
                                                           stratify=train_y,
@@ -61,14 +60,14 @@ class Dataloader(pl.LightningDataModule):
         self.test_dataset = None
         self.predict_dataset = None
 
-    def tokenizing(self, df):
+    def tokenizing(self, x):
         concat_entity = []
-        for sub_ent, obj_ent in zip(df['subject_entity'], df['object_entity']):
+        for sub_ent, obj_ent in zip(x['subject_entity'], x['object_entity']):
             concat_entity.append(obj_ent + " [SEP] " + sub_ent)
 
         inputs = self.tokenizer(
             concat_entity,
-            list(df['sentence']),
+            list(x['sentence']),
             return_tensors='pt',
             padding=True,
             truncation=True,
@@ -78,12 +77,13 @@ class Dataloader(pl.LightningDataModule):
 
         return inputs
 
-    def preprocessing(self, x, y, train=False):
+    def preprocessing(self, x, y=[], train=False):
         DC = DataCleaning(self.CFG['select_DC'])
         DA = DataAugmentation(self.CFG['select_DA'])
 
-        # 그냥 process의 return 없애고 DC.process(data)만 쓰는 것은?
         x = DC.process(x)
+        
+        # label 설정
         if train:
             x = DA.process(x)
             targets = [self.label2num[label] for label in y]
@@ -91,8 +91,8 @@ class Dataloader(pl.LightningDataModule):
             targets = []
 
         # 텍스트 데이터 토큰화
-        inputs = self.tokenizing(x)  # 뒤에 train_test_split을 위해
-
+        inputs = self.tokenizing(x)
+        
         return inputs, targets
 
     def setup(self, stage='fit'):
@@ -103,8 +103,9 @@ class Dataloader(pl.LightningDataModule):
             val_inputs, val_targets = self.preprocessing(
                 self.val_x, self.val_y, train=True)  # train=True 맞나?
             self.train_dataset = Dataset(train_inputs, train_targets)
+            
+            val_inputs, val_targets = self.preprocessing(self.val_x, self.val_y, train=True)
             self.val_dataset = Dataset(val_inputs, val_targets)
-            self.test_dataset = self.val_dataset
         else:
             # 평가 데이터 호출
             predict_inputs, predict_targets = self.preprocessing(
@@ -113,12 +114,9 @@ class Dataloader(pl.LightningDataModule):
 
     def train_dataloader(self):
         return DataLoader(self.train_dataset, batch_size=self.CFG['train']['batch_size'], shuffle=self.CFG['train']['shuffle'])
-
+    
     def val_dataloader(self):
         return DataLoader(self.val_dataset, batch_size=self.CFG['train']['batch_size'])
-
-    def test_dataloader(self):
-        return DataLoader(self.test_dataset, batch_size=self.CFG['train']['batch_size'])
 
     def predict_dataloader(self):
         return DataLoader(self.predict_dataset, batch_size=self.CFG['train']['batch_size'])
@@ -159,7 +157,11 @@ class DataCleaning():
             start_idx_list, end_idx_list = [], []
 
             for i in range(len(df)):
-                dictionary = eval(df.iloc[i][column])
+                try:
+                    dictionary = eval(df.iloc[i][column])
+                except:
+                    print(df.iloc[i])
+                    exit()
 
                 word_list.append(dictionary['word'])
                 start_idx_list.append(dictionary['start_idx'])
@@ -169,6 +171,8 @@ class DataCleaning():
             df[column] = word_list
             for key in ['start_idx', 'end_idx', 'type']:
                 df[f"{type_entity}_{key}"] = eval(f"{key}_list")
+        
+        return df
 
         return df
 
@@ -213,7 +217,7 @@ def load_data():
         label2num = pickle.load(f)
     with open('./code/dict_num_to_label.pkl', 'rb') as f:
         num2label = pickle.load(f)
-
+    
     return train_x, train_y, test_x, label2num, num2label
 
 

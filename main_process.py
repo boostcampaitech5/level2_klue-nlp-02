@@ -1,9 +1,8 @@
 import yaml
-import torch
-import transformers
 import pandas as pd
 import pytorch_lightning as pl
 import wandb
+import pickle
 
 from models.models import Model
 from utils import utils, data_controller
@@ -58,9 +57,19 @@ if __name__ == "__main__":
                          callbacks=[checkpoint, early_stopping])
 
     trainer.fit(model=model, datamodule=dataloader)
-
+    
     """---Inference---"""
-    preds_y, probs_y = trainer.predict(model=model, datamodule=dataloader)
+    predictions = trainer.predict(model=model, datamodule=dataloader)
+    
+    with open('./code/dict_num_to_label.pkl', 'rb') as f:
+        num2label = pickle.load(f)
+
+    pred_label, probs = [], []
+    for prediction in predictions:
+        for pred in prediction[0]:
+            pred_label.append(num2label[pred])
+        for prob in prediction[1]:
+            probs.append(prob)
 
     """---save---"""
     # write yaml
@@ -70,6 +79,6 @@ if __name__ == "__main__":
     # torch.save(model, f'{save_path}/{folder_name}_model.pt')
     # save submit
     submit = pd.read_csv('./code/prediction/sample_submission.csv')
-    submit['pred_label'] = preds_y
-    submit['probs'] = probs_y
+    submit['pred_label'] = pred_label
+    submit['probs'] = probs
     submit.to_csv(f'{save_path}/{folder_name}_submit.csv', index=False)
