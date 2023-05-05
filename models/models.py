@@ -46,6 +46,7 @@ class Model(pl.LightningModule):
         )
         loss = self.loss_func(logits, y)
         self.log("val_loss", loss)
+
         metric = metrics.compute_metrics(
             F.softmax(logits, dim=-1), y)
         self.log('val_micro_f1_Score', metric['micro f1 score'])
