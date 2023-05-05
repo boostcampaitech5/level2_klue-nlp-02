@@ -61,10 +61,10 @@ class Model(pl.LightningModule):
             attention_mask=x['attention_mask'],
             token_type_ids=x['token_type_ids']
         )
-        probs = F.softmax(logits, dim=-1).cpu().numpy()
-        preds = np.argmax(probs, axis=-1)
+        probs = F.softmax(logits, dim=-1)
+        preds = np.argmax(probs.cpu().numpy(), axis=-1)
 
-        return preds, probs
+        return preds, probs.tolist()
 
     def configure_optimizers(self):
         optimizer = self.optim(self.parameters(), lr=self.CFG['train']['LR'])
