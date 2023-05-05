@@ -1,5 +1,6 @@
 import numpy as np
 import pickle
+import math
 from sklearn.metrics import accuracy_score, f1_score, precision_recall_curve, auc
 
 
@@ -28,33 +29,34 @@ def klue_re_micro_f1(preds, labels):
     return f1
 
 
-def klue_re_auprc(probs, labels):
+def klue_re_auprc(probs, labels, num_labels):
     """ KLUE-RE AUPRC
     Note:   해당 함수는 각각의 label(30개)에 대해 모델이 예측한 probability를 바탕으로 auprc를 계산하는 함수입니다.
             auprc는 x축 recall, y축 precision인 그래프에서의 면적 값을 의미합니다.
             각 클래스에 대한 auprc를 score에 저장한 후, 평균낸 값이 전체 auprc가 됩니다.
+            
+            labels의 사이즈를 probs와 맞추기 위해 np.eye를 통해 one-hot encoding으로 변환합니다.
             
     Arguments:
     probs:  (batch, num_labels)
     labels: (batch,)
 
     Return:
-    float number
+    average AUPRC score(float)
     """
 
-    # label에 대한 one-hot encoding으로 변환 [0, 0, 1, 0, ... 0]. 리턴사이즈=(batch, num_label) -> prob과 사이즈 맞추기 위함. classification으로 각 라벨에 대한 에러 계산을 위한 것
-    labels = np.eye(30)[labels]
-    score = np.zeros((30,))     # label 각각에 대한 점수 기록을 위한 빈 numpy
+    labels = np.eye(num_labels)[labels]
+    score = np.zeros((num_labels,))     # label 각각에 대한 점수 기록을 위한 빈 numpy
 
-    # x축 recall, y축 precision 에서 면적 계산=auprc. 각 라벨별(c)로 auprc를 계산하고 평균낸다.
-    for c in range(30):
+    for c in range(num_labels):
         # axis=1, c 번째 column을 가져와서 1차원 array로 만듦(ravel). 사이즈 = (batch, )
         targets_c = labels.take([c], axis=1).ravel()
         preds_c = probs.take([c], axis=1).ravel()
-        precision, recall, _ = precision_recall_curve(
-            targets_c, preds_c)   # 배치 전체에 대한 계산 metric
+        precision, recall, _ = precision_recall_curve(targets_c, preds_c)   # 배치 전체에 대한 계산 metric
+        
         # 라벨 c 에 대해서 batch 전체를 가지고 auc 계산.
-        score[c] = auc(recall, precision)
+        score[c] = auc(recall, precision) if not math.isnan(auc(recall, precision)) else 0
+    
 
     return np.average(score) * 100.0  # 배치 전체에 대해 계산했던 걸 다시 전체 평균
 
@@ -74,10 +76,11 @@ def compute_metrics(outputs, y):
     labels = y.cpu().detach().numpy()
     preds = outputs.cpu().detach().numpy().argmax(-1)
     probs = outputs.cpu().detach().numpy()   # (batch, num_labels)
+    num_labels = outputs.size(-1)            # num_labels
 
     # calculate accuracy using sklearn's function
     f1 = klue_re_micro_f1(preds, labels)
-    auprc = klue_re_auprc(probs, labels)
+    auprc = klue_re_auprc(probs, labels, num_labels)
     acc = accuracy_score(labels, preds)  # 리더보드 평가에는 포함되지 않습니다.
 
     return {
