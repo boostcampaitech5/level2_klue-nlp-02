@@ -41,7 +41,7 @@ class Dataloader(pl.LightningDataModule):
         self.CFG = CFG
         self.tokenizer = tokenizer
         
-        train_x, train_y, predict_x, label2num, num2label = load_data()
+        train_x, train_y, predict_x = load_data()
         train_x, val_x, train_y, val_y = train_test_split(train_x, train_y,
                                                           stratify=train_y,
                                                           test_size=self.CFG['train']['test_size'],
@@ -52,8 +52,7 @@ class Dataloader(pl.LightningDataModule):
         self.val_x = val_x
         self.val_y = val_y
         self.predict_x = predict_x
-        self.label2num = label2num
-        self.num2label = num2label
+        self.label2num = load_label2num()
 
         self.train_dataset = None
         self.val_dataset = None  # val == test
@@ -94,16 +93,13 @@ class Dataloader(pl.LightningDataModule):
         DA = DataAugmentation(self.CFG['select_DA'])
 
         x = DC.process(x)
-        
-        # label 설정
+        # 데이터 증강
         if train:
             x = DA.process(x)
-            targets = [self.label2num[label] for label in y]
-        else:
-            targets = []
 
         # 텍스트 데이터 토큰화
         inputs = self.tokenizing(x)
+        targets = [self.label2num[label] for label in y]
         
         return inputs, targets
 
@@ -112,10 +108,9 @@ class Dataloader(pl.LightningDataModule):
             # 학습 데이터 준비
             train_inputs, train_targets = self.preprocessing(
                 self.train_x, self.train_y, train=True)
-            val_inputs, val_targets = self.preprocessing(
-                self.val_x, self.val_y, train=True)  # train=True 맞나?
             self.train_dataset = Dataset(train_inputs, train_targets)
             
+            val_inputs, val_targets = self.preprocessing(self.val_x, self.val_y)
             self.val_dataset = Dataset(val_inputs, val_targets)
         else:
             # 평가 데이터 호출
@@ -137,11 +132,10 @@ class DataCleaning():
     """
     config select DC에 명시된 Data Cleaning 기법을 적용시켜주는 클래스
     """
-
     def __init__(self, select_list):
         self.select_list = select_list
 
-    def process(self, df):  # tqdm 써볼까? 생각보다 오래걸리네용,,
+    def process(self, df):
         if self.select_list:
             for method_name in self.select_list:
                 method = eval("self." + method_name)
@@ -215,20 +209,37 @@ def load_data():
     """
     학습 데이터와 테스트 데이터 DataFrame 가져오기
     """
-    train_df = pd.read_csv('./dataset/train/train.csv')
+    train_df = pd.read_csv('./dataset/new_train.csv')
     train_df.drop(['id', 'source'], axis=1, inplace=True)
     train_x = train_df.drop(['label'], axis=1)
     train_y = train_df['label']
-    test_x = pd.read_csv('./dataset/test/test_data.csv')
+    test_x = pd.read_csv('./dataset/new_test.csv')
     test_x.drop(['id', 'source'], axis=1, inplace=True)
+    
+    return train_x, train_y, test_x
 
+
+def load_label2num():
     with open('./code/dict_label_to_num.pkl', 'rb') as f:
         label2num = pickle.load(f)
+    
+    return label2num
+
+
+def load_num2label():
     with open('./code/dict_num_to_label.pkl', 'rb') as f:
         num2label = pickle.load(f)
     
-    return train_x, train_y, test_x, label2num, num2label
+    return num2label
 
 
 if __name__ == "__main__":
-    pass
+    train_df = pd.read_csv('./dataset/train/train.csv')
+    test_df = pd.read_csv('./dataset/test/test_data.csv')
+
+    # entity_parsing이 적용된 DataFrame 파일 만들기
+    new_train_df = DataCleaning([]).entity_parsing(train_df.copy(deep=True))
+    new_test_df = DataCleaning([]).entity_parsing(test_df.copy(deep=True))
+
+    new_train_df.to_csv('./dataset/new_train.csv', index=False)
+    new_test_df.to_csv('./dataset/new_test.csv', index=False)

@@ -2,7 +2,6 @@ import yaml
 import pandas as pd
 import pytorch_lightning as pl
 import wandb
-import pickle
 
 from models.models import Model
 from utils import utils, data_controller
@@ -27,7 +26,7 @@ if __name__ == "__main__":
     # wandb 설정
     wandb_logger = wandb.init(
         name=folder_name, project="level2", entity=CFG['wandb']['id'], dir=save_path)
-    wandb_logger = WandbLogger()
+    wandb_logger = WandbLogger(save_dir=save_path) # 체크포인트 저장을 위한 경로 지정
     wandb_logger.experiment.config.update(CFG)
 
     """---Train---"""
@@ -62,9 +61,7 @@ if __name__ == "__main__":
     """---Inference---"""
     predictions = trainer.predict(model=model, datamodule=dataloader)
     
-    with open('./code/dict_num_to_label.pkl', 'rb') as f:
-        num2label = pickle.load(f)
-
+    num2label = data_controller.load_num2label()
     pred_label, probs = [], []
     for prediction in predictions:
         for pred in prediction[0]:
