@@ -116,7 +116,6 @@ class Dataloader(pl.LightningDataModule):
                 self.val_x, self.val_y, train=True)  # train=True 맞나?
             self.train_dataset = Dataset(train_inputs, train_targets)
             
-            val_inputs, val_targets = self.preprocessing(self.val_x, self.val_y, train=True)
             self.val_dataset = Dataset(val_inputs, val_targets)
         else:
             # 평가 데이터 호출
@@ -173,11 +172,7 @@ class DataCleaning():
             start_idx_list, end_idx_list = [], []
 
             for i in range(len(df)):
-                try:
-                    dictionary = eval(df.iloc[i][column])
-                except:
-                    print(df.iloc[i])
-                    exit()
+                dictionary = eval(df.iloc[i][column])
 
                 word_list.append(dictionary['word'])
                 start_idx_list.append(dictionary['start_idx'])
