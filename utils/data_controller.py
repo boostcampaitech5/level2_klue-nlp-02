@@ -60,6 +60,18 @@ class Dataloader(pl.LightningDataModule):
         self.predict_dataset = None
 
     def tokenizing(self, x):
+        """ 토크나이징 함수
+        
+        Note:   두 entity를 [SEP]토큰으로 이어붙인 리스트와 
+                원래 x['sentence'] 리스트를 토크나이저에 인자로 집어넣습니다.
+                inputs는 따라서 input_ids, attention_mask, token_type_ids가 각각 포함된 배열형태로 구성됩니다.
+                
+        Arguments:
+        x: pd.DataFrame
+        
+        Returns:
+        inputs: Dict({'input_ids', 'token_type_ids', 'attention_mask'}), 각 tensor(num_data, max_length)
+        """
         concat_entity = []
         for sub_ent, obj_ent in zip(x['subject_entity'], x['object_entity']):
             concat_entity.append(obj_ent + " [SEP] " + sub_ent)
@@ -136,12 +148,16 @@ class DataCleaning():
     """
 
     def entity_parsing(self, df):
-        """
-        entity에서 word, start_idx, end_idx, type 분리하기
-
-        <데이터 예시>
-        subject_entity : {'word': '비틀즈', 'start_idx': 24, 'end_idx': 26, 'type': 'ORG'}
-        object_entity : {'word': '조지 해리슨', 'start_idx': 13, 'end_idx': 18, 'type': 'PER'}
+        """ entity에서 word, start_idx, end_idx, type 분리하기
+        Note: <데이터 예시>
+            subject_entity : {'word': '비틀즈', 'start_idx': 24, 'end_idx': 26, 'type': 'ORG'}
+            object_entity : {'word': '조지 해리슨', 'start_idx': 13, 'end_idx': 18, 'type': 'PER'}
+            
+        Arguments:
+        df: Cleaning을 수행하고자 하는 DataFrame
+        
+        Return:
+        df: Cleaning 작업이 완료된 DataFrame
         """
         for type_entity in ['subject', 'object']:
             column = f"{type_entity}_entity"
@@ -150,11 +166,7 @@ class DataCleaning():
             start_idx_list, end_idx_list = [], []
 
             for i in range(len(df)):
-                try:
-                    dictionary = eval(df.iloc[i][column])
-                except:
-                    print(df.iloc[i])
-                    exit()
+                dictionary = eval(df.iloc[i][column])
 
                 word_list.append(dictionary['word'])
                 start_idx_list.append(dictionary['start_idx'])

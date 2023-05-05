@@ -2,18 +2,17 @@
 name: 이름
 seed: 42
 train:
-  model_name: klue/bert-base
+  model_name: 허깅페이스 모델명
   epoch: 100
   batch_size: 32
   LR: 0.00001
-  lossF: CrossEntropyLoss
-  optim: AdamW
+  lossF: 로스 함수명
+  optim: 옵티마이저 함수명
   shuffle: True
   token_max_len: 100
   patience: 5
   test_size: 0.2
 select_DC:
-  - entity_parsing # 필수
 select_DA:
 wandb:
   id: 아이디
