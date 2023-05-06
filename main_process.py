@@ -26,7 +26,7 @@ if __name__ == "__main__":
     # wandb 설정
     wandb_logger = wandb.init(
         name=folder_name, project="level2", entity=CFG['wandb']['id'], dir=save_path)
-    wandb_logger = WandbLogger(save_dir=save_path) # 체크포인트 저장을 위한 경로 지정
+    wandb_logger = WandbLogger(save_dir=save_path)  # 체크포인트 저장을 위한 경로 지정
     wandb_logger.experiment.config.update(CFG)
 
     """---Train---"""
@@ -54,20 +54,20 @@ if __name__ == "__main__":
                          log_every_n_steps=1,
                          val_check_interval=0.5,           # 1 epoch 당 valid loss 2번 체크: 학습여부 빠르게 체크
                          logger=wandb_logger,
-                         callbacks=[checkpoint, early_stopping])
+                         callbacks=[checkpoint])  # , early_stopping])
 
     trainer.fit(model=model, datamodule=dataloader)
-    
+
     """---Inference---"""
     predictions = trainer.predict(model=model, datamodule=dataloader)
-    
+
     num2label = data_controller.load_num2label()
     pred_label, probs = [], []
     for prediction in predictions:
         for pred in prediction[0]:
             pred_label.append(num2label[pred])
         for prob in prediction[1]:
-            probs.append(prob)
+            probs.append(list(map(float, prob)))
 
     """---save---"""
     # write yaml

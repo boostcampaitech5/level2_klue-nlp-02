@@ -5,6 +5,7 @@ import pytorch_lightning as pl
 
 from utils import metrics
 
+
 class Model(pl.LightningModule):
     def __init__(self, LM, CFG):
         super().__init__()
@@ -12,7 +13,7 @@ class Model(pl.LightningModule):
         self.CFG = CFG
 
         # 사용할 모델을 호출
-        self.LM = LM # Language Model
+        self.LM = LM  # Language Model
         self.loss_func = eval("torch.nn." + self.CFG['train']['lossF'])()
         self.optim = eval("torch.optim." + self.CFG['train']['optim'])
 
@@ -74,15 +75,17 @@ class Model(pl.LightningModule):
         #     lr_lambda=lambda epoch: 0.95 ** epoch,
         #     last_epoch=-1,
         #     verbose=False)
-        scheduler = torch.optim.lr_scheduler.StepLR(
-            optimizer=optimizer,
-            step_size=10,
-            gamma=0.7,
-            verbose=True)
+        # scheduler = torch.optim.lr_scheduler.StepLR(
+        #     optimizer=optimizer,
+        #     step_size=10,
+        #     gamma=0.7,
+        #     verbose=True)
+        scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=self.CFG['train']['LR'] / 10, max_lr=self.CFG['train']['LR'],
+                                                      step_size_up=10, step_size_down=10, cycle_momentum=False, mode='triangular')
 
         lr_scheduler = {
             'scheduler': scheduler,
             'name': 'LR_schedule'
         }
 
-        return [optimizer]  # , [lr_scheduler]
+        return [optimizer], [lr_scheduler]
