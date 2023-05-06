@@ -1,3 +1,6 @@
+import os
+import tqdm
+import torch
 import yaml
 import pandas as pd
 import pytorch_lightning as pl
@@ -37,16 +40,17 @@ if __name__ == "__main__":
         pretrained_model_name_or_path=CFG['train']['model_name'], num_labels=30)
     model = Model(LM, CFG)
     # check point
-    checkpoint = ModelCheckpoint(monitor='val_loss',
-                                 save_top_k=3,
-                                 save_last=True,
+    checkpoint = ModelCheckpoint(monitor='val_micro_f1_Score',
+                                 save_top_k=CFG['train']['save_top_k'],
+                                 save_last=False,
                                  save_weights_only=True,
-                                 verbose=False,
-                                 filename='{epoch}-{val_loss:.4f}',
-                                 mode='min')
+                                 verbose=True,
+                                 dirpath=f"{save_path}/checkpoints",
+                                 filename='{epoch}-{val_micro_f1_Score:.4f}',
+                                 mode='max')
     # Earlystopping
     early_stopping = EarlyStopping(
-        monitor='val_loss', patience=CFG['train']['patience'], mode='min', verbose=True)
+        monitor='val_micro_f1_Score', patience=CFG['train']['patience'], mode='min', verbose=True)
     # fit
     trainer = pl.Trainer(accelerator='gpu',
                          max_epochs=CFG['train']['epoch'],
@@ -59,15 +63,20 @@ if __name__ == "__main__":
     trainer.fit(model=model, datamodule=dataloader)
 
     """---Inference---"""
-    predictions = trainer.predict(model=model, datamodule=dataloader)
+    def inference_model(model, dataloader):
+        predictions = trainer.predict(model=model, datamodule=dataloader)
 
-    num2label = data_controller.load_num2label()
-    pred_label, probs = [], []
-    for prediction in predictions:
-        for pred in prediction[0]:
-            pred_label.append(num2label[pred])
-        for prob in prediction[1]:
-            probs.append(list(map(float, prob)))
+        num2label = data_controller.load_num2label()
+        pred_label, probs = [], []
+        for prediction in predictions:
+            for pred in prediction[0]:
+                pred_label.append(num2label[pred])
+            for prob in prediction[1]:
+                probs.append(list(map(float, prob)))
+
+        return pred_label, probs
+
+    pred_label, probs = inference_model(model, dataloader)
 
     """---save---"""
     # write yaml
@@ -76,7 +85,18 @@ if __name__ == "__main__":
     # save mode
     # torch.save(model, f'{save_path}/{folder_name}_model.pt')
     # save submit
-    submit = pd.read_csv('./code/prediction/sample_submission.csv')
-    submit['pred_label'] = pred_label
-    submit['probs'] = probs
-    submit.to_csv(f'{save_path}/{folder_name}_submit.csv', index=False)
+    def save_csv(pred_label, probs, filename='last'):
+        submit = pd.read_csv('./code/prediction/sample_submission.csv')
+        submit['pred_label'] = pred_label
+        submit['probs'] = probs
+        submit.to_csv(f'{save_path}/{folder_name}_{filename}_submit.csv', index=False)
+
+    save_csv(pred_label, probs)
+
+    for ckpt_name in tqdm(os.listdir(f"{save_path}/checkpoints"), desc="inferencing_ckpt"):
+        print("Now...  "+ ckpt_name)
+        checkpoint = torch.load(ckpt_name)
+        model.load_state_dict(checkpoint['state_dict'])
+
+        pred_label, probs = inference_model(model, dataloader)
+        save_csv(pred_label, probs, ckpt_name.split('=')[-1][:6])
