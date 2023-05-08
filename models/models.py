@@ -80,8 +80,7 @@ class Model(pl.LightningModule):
         #     step_size=10,
         #     gamma=0.7,
         #     verbose=True)
-        scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=self.CFG['train']['LR'] / 10, max_lr=self.CFG['train']['LR'],
-                                                      step_size_up=10, step_size_down=10, cycle_momentum=False, mode='triangular')
+        scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=self.CFG['train']['LR'] / self.CFG['train']['LR_base'], max_lr=self.CFG['train']['LR'] / self.CFG['train']['LR_max'], step_size_up=self.CFG['train']['LR_step_up'], step_size_down=self.CFG['train']['LR_step_down'], cycle_momentum=False, mode='triangular')
 
         lr_scheduler = {
             'scheduler': scheduler,

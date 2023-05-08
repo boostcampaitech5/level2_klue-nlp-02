@@ -1,5 +1,5 @@
 import os
-import tqdm
+from tqdm.auto import tqdm
 import torch
 import yaml
 import pandas as pd
@@ -95,8 +95,8 @@ if __name__ == "__main__":
 
     for ckpt_name in tqdm(os.listdir(f"{save_path}/checkpoints"), desc="inferencing_ckpt"):
         print("Now...  "+ ckpt_name)
-        checkpoint = torch.load(ckpt_name)
+        checkpoint = torch.load(f"{save_path}/checkpoints/{ckpt_name}")
         model.load_state_dict(checkpoint['state_dict'])
 
         pred_label, probs = inference_model(model, dataloader)
-        save_csv(pred_label, probs, ckpt_name.split('=')[-1][:6])
+        save_csv(pred_label, probs, ckpt_name.split('=')[-1][:7])

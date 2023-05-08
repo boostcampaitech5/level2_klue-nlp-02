@@ -6,6 +6,10 @@ train:
   epoch: 100
   batch_size: 32
   LR: 0.00001
+  LR_bass: 20             # scheduler를 쓴다면, LR에 대한 min_lr을 적어주세요(20 == LR/20)
+  LR_max: 5               # scheduler를 쓴다면, LR에 대한 max_lr을 적어주세요(5 == LR/5)
+  LR_step_up: 10          # scheduler를 쓴다면, warmup epoch를 적어주세요
+  LR_step_down: 20        # scheduler를 쓴다면, cooldown epoch를 적어주세요 (단, up+down은 epoch과 동일해야 함)
   lossF: 로스 함수명
   optim: 옵티마이저 함수명
   shuffle: True
