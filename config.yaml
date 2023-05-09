@@ -13,6 +13,10 @@ train:
   patience: 5
   test_size: 0.2
 select_DC:
+  - add_tokens
+  - remove_duplicated
 select_DA:
 wandb:
   id: 아이디
+option:
+  early_stop: True

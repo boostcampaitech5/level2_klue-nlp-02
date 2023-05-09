@@ -44,9 +44,12 @@ if __name__ == "__main__":
                                  verbose=False,
                                  filename='{epoch}-{val_loss:.4f}',
                                  mode='min')
+    callbacks = [checkpoint]
     # Earlystopping
-    early_stopping = EarlyStopping(
-        monitor='val_loss', patience=CFG['train']['patience'], mode='min', verbose=True)
+    if CFG['option']['early_stop']:
+        early_stopping = EarlyStopping(
+            monitor='val_loss', patience=CFG['train']['patience'], mode='min', verbose=True)
+        callbacks.append(early_stopping)
     # fit
     trainer = pl.Trainer(accelerator='gpu',
                          max_epochs=CFG['train']['epoch'],
@@ -54,7 +57,7 @@ if __name__ == "__main__":
                          log_every_n_steps=1,
                          val_check_interval=0.5,           # 1 epoch 당 valid loss 2번 체크: 학습여부 빠르게 체크
                          logger=wandb_logger,
-                         callbacks=[checkpoint])#, early_stopping])
+                         callbacks=callbacks)
 
     trainer.fit(model=model, datamodule=dataloader)
     
