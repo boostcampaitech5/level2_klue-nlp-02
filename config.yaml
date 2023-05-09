@@ -13,8 +13,9 @@ train:
   patience: 5
   test_size: 0.2
 select_DC:
-  - add_tokens
   - remove_duplicated
+  - add_tokens_base
+  # - add_tokens_detail
 select_DA:
 wandb:
   id: 아이디

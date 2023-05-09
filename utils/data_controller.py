@@ -132,12 +132,15 @@ class DataCleaning():
     """
     config select DC에 명시된 Data Cleaning 기법을 적용시켜주는 클래스
     """
-    def __init__(self, select_list):
+    def __init__(self, select_list, train=True):
         self.select_list = select_list
+        self.train = train
+        self.continue_list = ['remove_duplicated']
 
     def process(self, df):
         if self.select_list:
             for method_name in self.select_list:
+                if not self.train and method_name in self.continue_list: continue
                 method = eval("self." + method_name)
                 df = method(df)
 
@@ -146,9 +149,9 @@ class DataCleaning():
     """
     data cleaning 코드
     """
-
     def entity_parsing(self, df):
-        """ entity에서 word, start_idx, end_idx, type 분리하기
+        """ 
+        entity에서 word, start_idx, end_idx, type 분리하기
         Note: <데이터 예시>
             subject_entity : {'word': '비틀즈', 'start_idx': 24, 'end_idx': 26, 'type': 'ORG'}
             object_entity : {'word': '조지 해리슨', 'start_idx': 13, 'end_idx': 18, 'type': 'PER'}
@@ -177,6 +180,81 @@ class DataCleaning():
             for key in ['start_idx', 'end_idx', 'type']:
                 df[f"{type_entity}_{key}"] = eval(f"{key}_list")
         
+        return df
+    
+    def remove_duplicated(self, df):
+        """
+        sentence, subject_entity, object_entity는 동일하지만 label이 두 개 이상 지정된 경우
+        데이터를 직접 봐서 필요한 label 선택하기
+        """
+        del_idx = [6749, 8364, 22258, 277, 10202, 4212]
+        df.drop(del_idx, axis=0, inplace=True)
+
+        df.reset_index(drop=True, inplace=True)
+        
+        return df
+    
+    def add_tokens_base(self, df):
+        """
+        sentence에 새로운 토큰 태그를 추가하기
+
+        entity -> [ENT]
+        일본어, 한자 -> [OTH]
+        """
+        # ENT 태크 달아주기
+        new_sentence = []
+        for _, row in train_df.iterrows():
+            sentence = row["sentence"]
+
+            for check, idx in enumerate(sorted([row['subject_start_idx'], row['subject_end_idx'], row['object_start_idx'], row['object_end_idx']], reverse=True)):
+                if check % 2 == 0:
+                    sentence = sentence[:idx+1] + " [\ENT] " + sentence[idx+1:]
+                else:
+                    sentence = sentence[:idx] + "[ENT] " + sentence[idx:]
+            
+            new_sentence.append(sentence)
+        df['sentence'] = new_sentence
+
+        # OTH 태그 달아주기
+        df['sentence'].replace(r'[ぁ-ゔァ-ヴー々〆〤一-龥]+', '[OTH]', regex=True, inplace=True)
+
+        df.reset_index(drop=True, inplace=True)
+
+        return df
+    
+    def add_tokens_detail(self, df):
+        """
+        sentence에 새로운 토큰 태그를 추가하기
+
+        entity -> [{S|O}:{type}]
+        일본어, 한자 -> [OTH]
+        """
+        # [{S|O}:{type}] 태크 달아주기
+        new_sentence = []
+        for _, row in train_df.iterrows():
+            sentence = row["sentence"]
+            trigger = True if row['object_end_idx'] > row['subject_end_idx'] else False
+
+            for check, idx in enumerate(sorted([row['subject_start_idx'], row['subject_end_idx'], row['object_start_idx'], row['object_end_idx']], reverse=True)):
+                if trigger:
+                    token = f"O:{row['object_type']}"
+                else:
+                    token = f"S:{row['subject_type']}"
+
+                if check % 2 == 0:
+                    sentence = sentence[:idx+1] + f" [\{token}] " + sentence[idx+1:]
+                else:
+                    sentence = sentence[:idx] + f"[{token}] " + sentence[idx:]
+                    trigger = not trigger
+            
+            new_sentence.append(sentence)
+        df['sentence'] = new_sentence
+
+        # OTH 태그 달아주기
+        df['sentence'].replace(r'[ぁ-ゔァ-ヴー々〆〤一-龥]+', '[OTH]', regex=True, inplace=True)
+
+        df.reset_index(drop=True, inplace=True)
+
         return df
 
 
