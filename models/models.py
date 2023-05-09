@@ -68,7 +68,10 @@ class Model(pl.LightningModule):
         return preds, probs.tolist()
 
     def configure_optimizers(self):
-        optimizer = self.optim(self.parameters(), lr=self.CFG['train']['LR'])
+        if self.CFG['train']['optim'] == 'SGD':
+            optimizer = self.optim(self.parameters(), lr=self.CFG['train']['LR'], momentum=0.9)
+        else:
+            optimizer = self.optim(self.parameters(), lr=self.CFG['train']['LR'])
         # scheduler = torch.optim.lr_scheduler.LambdaLR(
         #     optimizer=optimizer,
         #     lr_lambda=lambda epoch: 0.95 ** epoch,
