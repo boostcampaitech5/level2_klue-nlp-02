@@ -42,21 +42,13 @@ class Dataloader(pl.LightningDataModule):
         self.tokenizer = tokenizer
         
         train_x, train_y, predict_x = load_data()
-        train_x, val_x, train_y, val_y = train_test_split(train_x, train_y,
-                                                          stratify=train_y,
-                                                          test_size=self.CFG['train']['test_size'],
-                                                          shuffle=self.CFG['train']['shuffle'],
-                                                          random_state=self.CFG['seed'])
         self.train_x = train_x
         self.train_y = train_y
-        self.val_x = val_x
-        self.val_y = val_y
         self.predict_x = predict_x
         self.label2num = load_label2num()
 
         self.train_dataset = None
-        self.val_dataset = None  # val == test
-        self.test_dataset = None
+        self.val_dataset = None
         self.predict_dataset = None
 
     def tokenizing(self, x):
@@ -92,30 +84,42 @@ class Dataloader(pl.LightningDataModule):
         DC = DataCleaning(self.CFG['select_DC'])
         DA = DataAugmentation(self.CFG['select_DA'])
 
-        x = DC.process(x)
-        # 데이터 증강
         if train:
+            x = DC.process(x, train=True)
             x = DA.process(x)
 
-        # 텍스트 데이터 토큰화
-        inputs = self.tokenizing(x)
-        targets = [self.label2num[label] for label in y]
+            x, val_x, y, val_y = train_test_split(x, y,
+                                                  stratify=y,
+                                                  test_size=self.CFG['train']['test_size'],
+                                                  shuffle=self.CFG['train']['shuffle'],
+                                                  random_state=self.CFG['seed'])
+            
+            train_inputs = self.tokenizing(x)
+            train_targets = [self.label2num[label] for label in y]
+
+            val_inputs = self.tokenizing(val_x)
+            val_targets = [self.label2num[label] for label in val_y]
+
+            return (train_inputs, train_targets), (val_inputs, val_targets)
+        else:
+            x = DC.process(x)
+
+            # 텍스트 데이터 토큰화
+            test_inputs = self.tokenizing(x)
+            test_targets = [self.label2num[label] for label in y]
         
-        return inputs, targets
+            return test_inputs, test_targets
 
     def setup(self, stage='fit'):
         if stage == 'fit':
             # 학습 데이터 준비
-            train_inputs, train_targets = self.preprocessing(
-                self.train_x, self.train_y, train=True)
-            self.train_dataset = Dataset(train_inputs, train_targets)
+            train, val = self.preprocessing(self.train_x, self.train_y, train=True)
             
-            val_inputs, val_targets = self.preprocessing(self.val_x, self.val_y)
-            self.val_dataset = Dataset(val_inputs, val_targets)
+            self.train_dataset = Dataset(train[0], train[1])
+            self.val_dataset = Dataset(val[0], val[1])
         else:
             # 평가 데이터 호출
-            predict_inputs, predict_targets = self.preprocessing(
-                self.predict_x)
+            predict_inputs, predict_targets = self.preprocessing(self.predict_x)
             self.predict_dataset = Dataset(predict_inputs, predict_targets)
 
     def train_dataloader(self):
@@ -132,15 +136,14 @@ class DataCleaning():
     """
     config select DC에 명시된 Data Cleaning 기법을 적용시켜주는 클래스
     """
-    def __init__(self, select_list, train=True):
+    def __init__(self, select_list):
         self.select_list = select_list
-        self.train = train
         self.continue_list = ['remove_duplicated']
 
-    def process(self, df):
+    def process(self, df, train=False):
         if self.select_list:
             for method_name in self.select_list:
-                if not self.train and method_name in self.continue_list: continue
+                if not train and method_name in self.continue_list: continue
                 method = eval("self." + method_name)
                 df = method(df)
 
@@ -191,7 +194,7 @@ class DataCleaning():
         df.drop(del_idx, axis=0, inplace=True)
 
         df.reset_index(drop=True, inplace=True)
-        
+
         return df
     
     def add_tokens_base(self, df):
@@ -208,7 +211,7 @@ class DataCleaning():
 
             for check, idx in enumerate(sorted([row['subject_start_idx'], row['subject_end_idx'], row['object_start_idx'], row['object_end_idx']], reverse=True)):
                 if check % 2 == 0:
-                    sentence = sentence[:idx+1] + " [\ENT] " + sentence[idx+1:]
+                    sentence = sentence[:idx+1] + " [/ENT] " + sentence[idx+1:]
                 else:
                     sentence = sentence[:idx] + "[ENT] " + sentence[idx:]
             
@@ -242,7 +245,7 @@ class DataCleaning():
                     token = f"S:{row['subject_type']}"
 
                 if check % 2 == 0:
-                    sentence = sentence[:idx+1] + f" [\{token}] " + sentence[idx+1:]
+                    sentence = sentence[:idx+1] + f" [/{token}] " + sentence[idx+1:]
                 else:
                     sentence = sentence[:idx] + f"[{token}] " + sentence[idx:]
                     trigger = not trigger
