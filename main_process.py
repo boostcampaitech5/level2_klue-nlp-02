@@ -32,10 +32,15 @@ if __name__ == "__main__":
     """---Train---"""
     # 데이터 로더와 모델 가져오기
     tokenizer = AutoTokenizer.from_pretrained(CFG['train']['model_name'])
+    special_tokens_list = utils.get_add_special_tokens()
+    tokenizer.add_special_tokens({
+        'additional_special_tokens': special_tokens_list
+    })
     dataloader = data_controller.Dataloader(tokenizer, CFG)
     LM = AutoModelForSequenceClassification.from_pretrained(
         pretrained_model_name_or_path=CFG['train']['model_name'], num_labels=30)
     model = Model(LM, CFG)
+    model.resize_token_embeddings(len(tokenizer))
     # check point
     checkpoint = ModelCheckpoint(monitor='val_loss',
                                  save_top_k=3,

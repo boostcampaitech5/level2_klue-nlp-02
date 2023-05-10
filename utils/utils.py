@@ -29,5 +29,17 @@ def get_best_check_point(save_path):
     return last_check_point
 
 
+def get_add_special_tokens():
+    arr = ['[OTH]', '[ENT]', '[/ENT]']
+
+    # entity detail
+    for category in ['S', 'O']:
+        for type in ['PER', 'NOH', 'ORG', 'LOC', 'POH', 'DUR', 'PNT', 'TIM', 'MNY', 'DAT']:
+            arr.append(f"[{category}:{type}]")
+            arr.append(f"[/{category}:{type}]")
+    
+    return arr
+
+
 if __name__ == "__main__":
     pass
