@@ -41,9 +41,8 @@ class Dataloader(pl.LightningDataModule):
         self.CFG = CFG
         self.tokenizer = tokenizer
         
-        train_x, train_y, predict_x = load_data()
-        self.train_x = train_x
-        self.train_y = train_y
+        train_df, predict_x = load_data()
+        self.train_df = train_df
         self.predict_x = predict_x
         self.label2num = load_label2num()
 
@@ -80,7 +79,7 @@ class Dataloader(pl.LightningDataModule):
 
         return inputs
 
-    def preprocessing(self, x, y=[], train=False):
+    def preprocessing(self, x, train=False):
         DC = DataCleaning(self.CFG['select_DC'])
         DA = DataAugmentation(self.CFG['select_DA'])
 
@@ -88,14 +87,17 @@ class Dataloader(pl.LightningDataModule):
             x = DC.process(x, train=True)
             x = DA.process(x)
 
-            x, val_x, y, val_y = train_test_split(x, y,
-                                                  stratify=y,
-                                                  test_size=self.CFG['train']['test_size'],
-                                                  shuffle=self.CFG['train']['shuffle'],
-                                                  random_state=self.CFG['seed'])
+            train_x = x.drop(['label'], axis=1)
+            train_y = x['label']
+
+            train_x, val_x, train_y, val_y = train_test_split(train_x, train_y,
+                                                              stratify=train_y,
+                                                              test_size=self.CFG['train']['test_size'],
+                                                              shuffle=self.CFG['train']['shuffle'],
+                                                              random_state=self.CFG['seed'])
             
-            train_inputs = self.tokenizing(x)
-            train_targets = [self.label2num[label] for label in y]
+            train_inputs = self.tokenizing(train_x)
+            train_targets = [self.label2num[label] for label in train_y]
 
             val_inputs = self.tokenizing(val_x)
             val_targets = [self.label2num[label] for label in val_y]
@@ -106,21 +108,20 @@ class Dataloader(pl.LightningDataModule):
 
             # 텍스트 데이터 토큰화
             test_inputs = self.tokenizing(x)
-            test_targets = [self.label2num[label] for label in y]
         
-            return test_inputs, test_targets
+            return test_inputs
 
     def setup(self, stage='fit'):
         if stage == 'fit':
             # 학습 데이터 준비
-            train, val = self.preprocessing(self.train_x, self.train_y, train=True)
+            train, val = self.preprocessing(self.train_df, train=True)
             
             self.train_dataset = Dataset(train[0], train[1])
             self.val_dataset = Dataset(val[0], val[1])
         else:
             # 평가 데이터 호출
-            predict_inputs, predict_targets = self.preprocessing(self.predict_x)
-            self.predict_dataset = Dataset(predict_inputs, predict_targets)
+            predict_inputs = self.preprocessing(self.predict_x)
+            self.predict_dataset = Dataset(predict_inputs)
 
     def train_dataloader(self):
         return DataLoader(self.train_dataset, batch_size=self.CFG['train']['batch_size'], shuffle=self.CFG['train']['shuffle'])
@@ -192,7 +193,6 @@ class DataCleaning():
         """
         del_idx = [6749, 8364, 22258, 277, 10202, 4212]
         df.drop(del_idx, axis=0, inplace=True)
-
         df.reset_index(drop=True, inplace=True)
 
         return df
@@ -206,7 +206,7 @@ class DataCleaning():
         """
         # ENT 태크 달아주기
         new_sentence = []
-        for _, row in train_df.iterrows():
+        for _, row in df.iterrows():
             sentence = row["sentence"]
 
             for check, idx in enumerate(sorted([row['subject_start_idx'], row['subject_end_idx'], row['object_start_idx'], row['object_end_idx']], reverse=True)):
@@ -221,8 +221,6 @@ class DataCleaning():
         # OTH 태그 달아주기
         df['sentence'].replace(r'[ぁ-ゔァ-ヴー々〆〤一-龥]+', '[OTH]', regex=True, inplace=True)
 
-        df.reset_index(drop=True, inplace=True)
-
         return df
     
     def add_tokens_detail(self, df):
@@ -234,7 +232,7 @@ class DataCleaning():
         """
         # [{S|O}:{type}] 태크 달아주기
         new_sentence = []
-        for _, row in train_df.iterrows():
+        for _, row in df.iterrows():
             sentence = row["sentence"]
             trigger = True if row['object_end_idx'] > row['subject_end_idx'] else False
 
@@ -255,8 +253,6 @@ class DataCleaning():
 
         # OTH 태그 달아주기
         df['sentence'].replace(r'[ぁ-ゔァ-ヴー々〆〤一-龥]+', '[OTH]', regex=True, inplace=True)
-
-        df.reset_index(drop=True, inplace=True)
 
         return df
 
@@ -292,12 +288,10 @@ def load_data():
     """
     train_df = pd.read_csv('./dataset/new_train.csv')
     train_df.drop(['id', 'source'], axis=1, inplace=True)
-    train_x = train_df.drop(['label'], axis=1)
-    train_y = train_df['label']
     test_x = pd.read_csv('./dataset/new_test.csv')
     test_x.drop(['id', 'source'], axis=1, inplace=True)
     
-    return train_x, train_y, test_x
+    return train_df, test_x
 
 
 def load_label2num():

@@ -39,8 +39,8 @@ if __name__ == "__main__":
     dataloader = data_controller.Dataloader(tokenizer, CFG)
     LM = AutoModelForSequenceClassification.from_pretrained(
         pretrained_model_name_or_path=CFG['train']['model_name'], num_labels=30)
+    LM.resize_token_embeddings(len(tokenizer))
     model = Model(LM, CFG)
-    model.resize_token_embeddings(len(tokenizer))
     # check point
     checkpoint = ModelCheckpoint(monitor='val_loss',
                                  save_top_k=3,
