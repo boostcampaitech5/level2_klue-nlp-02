@@ -6,6 +6,8 @@ import pytorch_lightning as pl
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset, DataLoader
 from konlpy.tag import Okt
+from pykospacing import Spacing
+
 
 class Dataset(Dataset):
     """
@@ -277,6 +279,16 @@ class DataCleaning():
             return " ".join(new_sentence)
             
         df['sentence'] = df['sentence'].apply(lambda x: logic(x))
+
+        return df
+    
+    def spacing(self, df):
+        """
+        띄어쓰기 문법 교정
+        """
+        lib = Spacing()
+
+        df['sentence'] = df['sentence'].apply(lambda x: lib(x.replace(" ", "")))
 
         return df
 

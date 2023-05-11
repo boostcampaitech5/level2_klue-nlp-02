@@ -1,8 +1,10 @@
+absl-py==1.4.0
 aiohttp==3.8.4
 aiosignal==1.3.1
 anyio==3.3.1
 appdirs==1.4.4
 argon2-cffi==21.1.0
+astunparse==1.6.3
 async-timeout==4.0.2
 attrs==23.1.0
 Babel==2.9.1
@@ -13,6 +15,7 @@ bleach==4.1.0
 boto3==1.18.47
 botocore==1.21.47
 brotlipy==0.7.0
+cachetools==5.3.0
 certifi==2022.12.7
 cffi @ file:///tmp/build/80754af9/cffi_1605538068321/work
 chardet @ file:///tmp/build/80754af9/chardet_1605303185383/work
@@ -32,16 +35,24 @@ dnspython==2.1.0
 docker-pycreds==0.4.0
 entrypoints==0.3
 filelock==3.12.0
+flatbuffers==1.12
 fonttools==4.39.3
 frozenlist==1.3.3
 fsspec==2023.4.0
+gast==0.4.0
 gevent==21.8.0
 gitdb==4.0.10
 GitPython==3.1.31
 glob2 @ file:///home/linux1/recipes/ci/glob2_1610991677669/work
+google-auth==2.18.0
+google-auth-oauthlib==0.4.6
+google-pasta==0.2.0
 greenlet==1.1.1
+grpcio==1.54.0
+h5py==3.1.0
 huggingface-hub==0.14.1
 idna==3.4
+importlib-metadata==6.6.0
 importlib-resources==5.12.0
 inotify-simple==1.2.1
 ipykernel==6.4.1
@@ -51,6 +62,7 @@ jedi @ file:///tmp/build/80754af9/jedi_1606932564285/work
 Jinja2==3.1.2
 jmespath==0.10.0
 joblib==1.2.0
+JPype1==1.4.1
 json5==0.9.6
 jsonschema==3.2.0
 jupyter-client==7.0.3
@@ -59,10 +71,16 @@ jupyter-server==1.11.0
 jupyterlab==3.1.13
 jupyterlab-pygments==0.1.2
 jupyterlab-server==2.8.1
+keras==2.9.0
+Keras-Preprocessing==1.1.2
 kiwisolver==1.4.4
+konlpy==0.6.0
 libarchive-c @ file:///home/linux1/recipes/ci/python-libarchive-c_1610974153025/work
+libclang==16.0.0
 lightning-utilities==0.8.0
 lit==16.0.2
+lxml==4.9.2
+Markdown==3.4.3
 MarkupSafe==2.1.2
 matplotlib==3.7.1
 matplotlib-inline==0.1.3
@@ -91,7 +109,9 @@ nvidia-cusolver-cu11==11.4.0.1
 nvidia-cusparse-cu11==11.7.4.91
 nvidia-nccl-cu11==2.14.3
 nvidia-nvtx-cu11==11.7.91
+oauthlib==3.2.2
 olefile==0.46
+opt-einsum==3.3.0
 packaging==23.1
 pandas==1.1.5
 pandocfilters==1.5.0
@@ -107,9 +127,12 @@ prompt-toolkit @ file:///tmp/build/80754af9/prompt-toolkit_1602688806899/work
 protobuf==3.18.0
 psutil @ file:///tmp/build/80754af9/psutil_1598370257551/work
 ptyprocess @ file:///tmp/build/80754af9/ptyprocess_1609355006118/work/dist/ptyprocess-0.7.0-py2.py3-none-any.whl
+pyasn1==0.5.0
+pyasn1-modules==0.3.0
 pycosat==0.6.3
 pycparser @ file:///tmp/build/80754af9/pycparser_1594388511720/work
 Pygments @ file:///tmp/build/80754af9/pygments_1610565767015/work
+pykospacing @ git+https://github.com/haven-jeon/PyKoSpacing.git@a058e90c9de41889c63bf2ee454bf1de064d70ff
 PyNaCl==1.4.0
 pyOpenSSL @ file:///tmp/build/80754af9/pyopenssl_1605545627475/work
 pyparsing==2.4.7
@@ -123,8 +146,10 @@ PyYAML==6.0
 pyzmq==22.3.0
 regex==2023.3.23
 requests==2.29.0
+requests-oauthlib==1.3.1
 requests-unixsocket==0.2.0
 retrying==1.3.3
+rsa==4.9
 ruamel-yaml==0.15.87
 s3transfer==0.5.0
 sacremoses==0.0.53
@@ -140,6 +165,13 @@ smmap==5.0.0
 sniffio==1.2.0
 soupsieve @ file:///tmp/build/80754af9/soupsieve_1607965878077/work
 sympy==1.11.1
+tensorboard==2.9.1
+tensorboard-data-server==0.6.1
+tensorboard-plugin-wit==1.8.1
+tensorflow==2.9.3
+tensorflow-estimator==2.9.0
+tensorflow-io-gcs-filesystem==0.32.0
+termcolor==2.3.0
 terminado==0.12.1
 testpath==0.5.0
 threadpoolctl==3.1.0
@@ -160,6 +192,7 @@ wcwidth @ file:///tmp/build/80754af9/wcwidth_1593447189090/work
 webencodings==0.5.1
 websocket-client==1.2.1
 Werkzeug==2.0.1
+wrapt==1.15.0
 yarl==1.9.2
 zipp==3.15.0
 zope.event==4.5.0
