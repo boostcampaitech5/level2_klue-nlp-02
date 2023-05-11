@@ -41,5 +41,11 @@ def get_add_special_tokens():
     return arr
 
 
+def save_csv(submit, pred_label, probs, save_path, folder_name, filename='last'):
+    submit['pred_label'] = pred_label
+    submit['probs'] = probs
+    submit.to_csv(f'{save_path}/{folder_name}_{filename}_submit.csv', index=False)
+
+
 if __name__ == "__main__":
     pass

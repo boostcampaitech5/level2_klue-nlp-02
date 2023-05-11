@@ -16,6 +16,9 @@ use_config.yaml
 results/
 .netrc
 
+lightning_logs
+nohup.out
+
 ### VisualStudioCode ###
 .vscode/*
 !.vscode/settings.json
