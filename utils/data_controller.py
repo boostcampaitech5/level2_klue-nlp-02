@@ -126,6 +126,7 @@ class Dataloader(pl.LightningDataModule):
             train, val = self.preprocessing(self.train_df, train=True)
             
             self.train_dataset = Dataset(train[0], train[1], train[2])
+            breakpoint()
             self.val_dataset = Dataset(val[0], val[1], val[2])
         else:
             # 평가 데이터 호출
@@ -208,7 +209,7 @@ class DataCleaning():
         df: normalize_class 작업이 완료된 DataFrame
         """
 
-        if '100' in df['labels']:  # test.csv에는 label이 모두 100이다.
+        if '100' in df['label']:  # test.csv에는 label이 모두 100이다.
             return df
         
         allowed_obj_for_class = \

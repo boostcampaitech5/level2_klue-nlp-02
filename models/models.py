@@ -11,10 +11,13 @@ def focal_loss(logits, y, sub_obj_types, types2labelnum, penalty_scale = 0.5):
     """
     logits = (batch_size, class_num)의 tensor
     y = (batch_size, )의 tensor
-    sub_obj_types = batch_size개의 (subject_type, object_type) 튜플을 가지고 있는 list
+    sub_obj_types = [(subject_type_1, subject_type_2, ...), (object_type_1, object_type_2, ...)]의 튜플을 가지고 있는 list
     types2labelnum = key가 (sub_type, obj_type)이고, value가 가능한 label의 number를 set으로 가지고 있는 dictionary
     penalty_scale = penalty의 scale을 조정할 변수
     """
+    
+    # sub_obj_types를 batch_size개의 (subject_type, object_type) 튜플을 가지고 있는 list로 바꿔주기 위함
+    sub_obj_types = [(sub_type, obj_type) for sub_type, obj_type in zip(*sub_obj_types)]
     
     # y를 one_hot represent함
     y_one_hot = torch.zeros_like(logits)  
@@ -69,7 +72,7 @@ class Model(pl.LightningModule):
             token_type_ids=x['token_type_ids']
         )
         loss = self.loss_func(logits, y) if not self.CFG['train']['focal_loss'] \
-        else focal_loss(logits, y, sub_obj_types, self.types2labelnum, self.CFG['train']['focal_loss_penalty'])
+        else focal_loss(logits, y, sub_obj_types, self.types2labelnum, self.CFG['train']['focal_loss_scale'])
 
         self.log("train_loss", loss)
 
