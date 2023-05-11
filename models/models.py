@@ -94,7 +94,7 @@ class Model(pl.LightningModule):
         self.log('val_AUPRC', metric['auprc'])
         self.log('val_acc', metric['accuracy'])
 
-        # return loss
+        return loss
 
     def predict_step(self, batch, batch_idx):
         x = batch
