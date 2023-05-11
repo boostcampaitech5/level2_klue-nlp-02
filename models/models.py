@@ -50,7 +50,7 @@ class Model(pl.LightningModule):
         self.LM = LM  # Language Model
         self.loss_func = eval("torch.nn." + self.CFG['train']['lossF'])()
         self.optim = eval("torch.optim." + self.CFG['train']['optim'])
-        self.types2labelnum = load_types2labelnum() if True else None
+        self.types2labelnum = load_types2labelnum() if self.CFG['train']['focal_loss'] else None
 
     def forward(self, input_ids, attention_mask, token_type_ids):
         outputs = self.LM(
@@ -68,7 +68,8 @@ class Model(pl.LightningModule):
             attention_mask=x['attention_mask'],
             token_type_ids=x['token_type_ids']
         )
-        loss = self.loss_func(logits, y) if True else focal_loss(logits, y, sub_obj_types, types2labelnum, penalty_scale)
+        loss = self.loss_func(logits, y) if not self.CFG['train']['focal_loss'] \
+        else focal_loss(logits, y, sub_obj_types, self.types2labelnum, self.CFG['train']['focal_loss_penalty'])
 
         self.log("train_loss", loss)
 
