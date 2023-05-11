@@ -6,13 +6,26 @@ train:
   epoch: 100
   batch_size: 32
   LR: 0.00001
+  LR_base: 20 # scheduler를 쓴다면, LR에 대한 min_lr을 적어주세요(20 == LR/20)
+  LR_max: 5 # scheduler를 쓴다면, LR에 대한 max_lr을 적어주세요(5 == LR/5)
+  LR_step_up: 10 # scheduler를 쓴다면, warmup epoch를 적어주세요
+  LR_step_down: 20 # scheduler를 쓴다면, cooldown epoch를 적어주세요 (단, up+down은 epoch과 동일해야 함)
   lossF: 로스 함수명
   optim: 옵티마이저 함수명
   shuffle: True
   token_max_len: 100
   patience: 5
   test_size: 0.2
+  save_top_k: 3 # Inference할 top k개의 모델.
 select_DC:
+  - remove_duplicated
+  - add_entity_tokens_base
+  # - add_entity_tokens_detail
+  - add_others_tokens
+  # - spacing
+  # - stop_words
 select_DA:
 wandb:
   id: 아이디
+option:
+  early_stop: True

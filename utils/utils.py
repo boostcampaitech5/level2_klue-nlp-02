@@ -29,5 +29,23 @@ def get_best_check_point(save_path):
     return last_check_point
 
 
+def get_add_special_tokens():
+    arr = ['[OTH]', '[ENT]', '[/ENT]', '[SUB]', '[OBJ]']
+
+    # entity detail
+    for category in ['S', 'O']:
+        for type in ['PER', 'NOH', 'ORG', 'LOC', 'POH', 'DUR', 'PNT', 'TIM', 'MNY', 'DAT']:
+            arr.append(f"[{category}:{type}]")
+            arr.append(f"[/{category}:{type}]")
+    
+    return arr
+
+
+def save_csv(submit, pred_label, probs, save_path, folder_name, filename='last'):
+    submit['pred_label'] = pred_label
+    submit['probs'] = probs
+    submit.to_csv(f'{save_path}/{folder_name}_{filename}_submit.csv', index=False)
+
+
 if __name__ == "__main__":
     pass
