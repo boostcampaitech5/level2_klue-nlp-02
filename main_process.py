@@ -50,7 +50,7 @@ if __name__ == "__main__":
                                  mode='max')
     # Earlystopping
     early_stopping = EarlyStopping(
-        monitor='val_micro_f1_Score', patience=CFG['train']['patience'], mode='min', verbose=True)
+        monitor='val_micro_f1_Score', patience=CFG['train']['patience'], mode='max', verbose=True)
     # fit
     trainer = pl.Trainer(accelerator='gpu',
                          max_epochs=CFG['train']['epoch'],
