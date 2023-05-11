@@ -89,10 +89,10 @@ class Dataloader(pl.LightningDataModule):
     def preprocessing(self, x, train=False):
         DC = DataCleaning(self.CFG['select_DC'])
         DA = DataAugmentation(self.CFG['select_DA'])
+
         if train:
             x = DC.process(x, train=True)
             x = DA.process(x)
-            y = x['label']
 
             train_x = x.drop(['label'], axis=1)
             train_y = x['label']
