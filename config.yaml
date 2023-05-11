@@ -18,6 +18,14 @@ train:
   test_size: 0.2
   save_top_k: 3 # Inference할 top k개의 모델.
 select_DC:
+  - remove_duplicated
+  - add_entity_tokens_base
+  # - add_entity_tokens_detail
+  - add_others_tokens
+  # - spacing
+  # - stop_words
 select_DA:
 wandb:
   id: 아이디
+option:
+  early_stop: True
