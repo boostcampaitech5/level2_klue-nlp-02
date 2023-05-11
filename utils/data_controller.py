@@ -7,6 +7,7 @@ from sklearn.model_selection import train_test_split
 from tqdm.auto import tqdm
 from torch.utils.data import Dataset, DataLoader
 from hanspell import spell_checker
+from pororo import Pororo
 
 class Dataset(Dataset):
     """
@@ -204,6 +205,67 @@ class DataCleaning():
             for i in range(len(df)):
                 df.loc[ i, type_entity ] = spell_checker.check(df.loc[ i, type_entity ]).checked
         
+        return df
+    
+    """
+    문장에서 entity를 제외한 사람 이름을 [PER]로 바꿔주는 코드 (윤리적 이슈)
+    """
+
+    def dc_change_per_others(self,df):
+        """ sentence를 변환
+            Pororo 라이브러리 사용 : https://github.com/kakaobrain/pororo
+            issue: torch v 1.6
+        
+        Note: <데이터 예시>
+            sentence: 특히 김동연 전 경제부총리를 비롯한 김두관 국회의원, 안규백 국회의원, 김종민 국회의원, 오제세 국회의원, 최운열 국회의원, 김정우 국회의원, 권칠승 국회의원, 맹성규 국회의원등 더불어민주당 국회의원 8명이 영상 축하 메세지를 보내 눈길을 끌었다.		
+            sub_ent: 안규백
+            obj_ent: 더불어민주당
+            ↓
+            sentence: 특히 [PER] 전 경제부총리를 비롯한 [PER] 국회의원, 안규백 국회의원, [PER] 국회의원, [PER] 국회의원, [PER] 국회의원, [PER] 국회의원, [PER] 국회의원, [PER] 국회의원등 더불어민주당 국회의원 8명이 영상 축하 메세지를 보내 눈길을 끌었다.
+            
+        Arguments:
+            df: 원본 DataFrame
+        
+        Return:
+            df: entitiy로 들어가는 이름 제외한 사람 이름을 [PER]로 변환하는 작업이 완료된 DataFrame
+        """
+
+        ner = Pororo(task="ner", lang="ko")   # ner 수행해 주는 pororo기능 object화
+
+        def per_change(sen):     
+            final_sen = ''
+            sen = ner(sen)     # [(특히, O), ( , O), (김동연, PERSON), ( , O), (전, O), ( , O), (경제부총리, CIVILIZATION), ... (끌었다., O)]
+            for (w,v) in sen:
+                if v =='PERSON':
+                    w = '[PER]'     # 김동연 -> [PER]
+                else:
+                    pass
+                # print(w)
+                final_sen+=w
+            # print(sen)
+            return final_sen  # 문장 반환: '특히 [PER] 전 경제부총리를 비롯한 [PER] 국회의원, '
+        
+        def per_change_sent(x):
+            sen_ori = x[0]
+            idx = sorted([0,x[3],x[4]+1,x[5],x[6]+1,len(x[0])])   # index 준비 : subject_start_idx, subject_end_idx,  ,,,
+            # print(idx,len(x[0]))
+            sentences=[]
+
+            for i in range(len(idx)-1):
+                # print(idx[i] , idx[i+1])
+                if idx[i]==x[3]:            # subject_start_idx: 사람 이름인데 sub_ent라면 [PER]로 변환하면 안돼서 따로 빼줌
+                    sentences.append(x[1])        
+                elif idx[i]==x[5]:          # object_start_idx: 마찬가지
+                    sentences.append(x[2])        
+                else:
+                    sentences.append(per_change(sen_ori[ idx[i] : idx[i+1] ]))   # 나머지 사람 이름은 [PER]로 변환
+                    # print(sen_ori[ idx[i] : idx[i+1] ])
+            # print(sentences)
+            return ' '.join(sentences)
+        
+
+        df['sentence']=df[['sentence', 'subject_entity','object_entity','subject_start_idx','subject_end_idx','object_start_idx','object_end_idx']].apply(per_change_sent, axis=1)
+        # apply로 데이터 프레임을 직접적으로 처리
         return df
 
 
