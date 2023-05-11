@@ -7,6 +7,9 @@ from sklearn.model_selection import train_test_split
 from tqdm.auto import tqdm
 from torch.utils.data import Dataset, DataLoader
 
+from hangulize import hangulize
+import re
+
 class Dataset(Dataset):
     """
     Dataloader에서 불러온 데이터를 Dataset으로 만들기
@@ -177,6 +180,30 @@ class DataCleaning():
             for key in ['start_idx', 'end_idx', 'type']:
                 df[f"{type_entity}_{key}"] = eval(f"{key}_list")
         
+        return df
+    
+    def pronounce_japan(self, df):
+        """ sentence, subject_entity, object_entity 컬럼에서 일본어 발음을 한글로 변환
+        hangulize 라이브러리 사용
+        
+        Note: <데이터 예시>
+        みなみ → 미나미
+        
+        Arguments:
+        df: pronounce_japan을 수행하고자 하는 DataFrame
+        
+        Return:
+        df: pronounce_japan 작업이 완료된 DataFrame
+        """
+        pattern = re.compile(r'[ぁ-ゔ]+|[ァ-ヴー]+[々〆〤]')
+        language = 'jpn'
+        for i in range(len(df)):
+            if pattern.search(df.loc[i,'sentence']):
+                df.loc[i, 'sentence'] = hangulize(df.loc[i, 'sentence'], language)
+            if pattern.search(df.loc[i,'subject_entity']):
+                df.loc[i, 'subject_entity'] = hangulize(df.loc[i, 'subject_entity'], language)
+            if pattern.search(df.loc[i,'object_entity']):
+                df.loc[i, 'object_entity'] = hangulize(df.loc[i, 'object_entity'], language)
         return df
 
 
