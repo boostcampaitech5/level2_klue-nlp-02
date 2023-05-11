@@ -16,6 +16,7 @@ select_DC:
   - remove_duplicated
   - add_tokens_base
   # - add_tokens_detail
+  - stop_words
 select_DA:
 wandb:
   id: 아이디

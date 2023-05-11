@@ -4,8 +4,8 @@ import pandas as pd
 import pytorch_lightning as pl
 
 from sklearn.model_selection import train_test_split
-from tqdm.auto import tqdm
 from torch.utils.data import Dataset, DataLoader
+from konlpy.tag import Okt
 
 class Dataset(Dataset):
     """
@@ -253,6 +253,30 @@ class DataCleaning():
 
         # OTH 태그 달아주기
         df['sentence'].replace(r'[ぁ-ゔァ-ヴー々〆〤一-龥]+', '[OTH]', regex=True, inplace=True)
+
+        return df
+    
+    def stop_words(self, df):
+        """
+        정적 데이터로 만들어진 불용어 리스트를 기반으로 입력 데이터의 불용어 제거하기
+        """
+        # 불용어 리스트
+        okt = Okt()
+        stop_words = set()
+        with open('./utils/stop_word.txt', 'r') as f:
+            for line in f.readlines():
+                stop_words.add(line.strip())
+
+        # 불용어 제거 후 새로운 문장 만들기
+        def logic(x):
+            new_sentence = []
+            for word in okt.morphs(x):
+                if word not in stop_words:
+                    new_sentence.append(word)
+            
+            return " ".join(new_sentence)
+            
+        df['sentence'] = df['sentence'].apply(lambda x: logic(x))
 
         return df
 
