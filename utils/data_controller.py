@@ -1,3 +1,4 @@
+import re
 import pickle
 import torch
 import pandas as pd
@@ -5,15 +6,13 @@ import pytorch_lightning as pl
 
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset, DataLoader
+from tqdm import tqdm
 from konlpy.tag import Okt
 from pykospacing import Spacing
 from hanspell import spell_checker
 from pororo import Pororo
-
-
-
 from hangulize import hangulize
-import re
+
 
 class Dataset(Dataset):
     """
