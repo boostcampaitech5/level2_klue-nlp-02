@@ -192,6 +192,8 @@ class DataCleaning():
         """
         sentence, subject_entity, object_entity는 동일하지만 label이 두 개 이상 지정된 경우
         데이터를 직접 봐서 필요한 label 선택하기
+
+        *train dataset에 대해서만 적용
         """
         del_idx = [6749, 8364, 22258, 277, 10202, 4212]
         df.drop(del_idx, axis=0, inplace=True)
@@ -199,12 +201,9 @@ class DataCleaning():
 
         return df
     
-    def add_tokens_base(self, df):
+    def add_entity_tokens_base(self, df):
         """
-        sentence에 새로운 토큰 태그를 추가하기
-
-        entity -> [ENT]
-        일본어, 한자 -> [OTH]
+        sentence에서 entity 앞뒤로 [ENT] [/ENT] 태그 달아줘 entity임을 명시하기
         """
         # ENT 태크 달아주기
         new_sentence = []
@@ -220,17 +219,11 @@ class DataCleaning():
             new_sentence.append(sentence)
         df['sentence'] = new_sentence
 
-        # OTH 태그 달아주기
-        df['sentence'].replace(r'[ぁ-ゔァ-ヴー々〆〤一-龥]+', '[OTH]', regex=True, inplace=True)
-
         return df
     
-    def add_tokens_detail(self, df):
+    def add_entity_tokens_detail(self, df):
         """
-        sentence에 새로운 토큰 태그를 추가하기
-
-        entity -> [{S|O}:{type}]
-        일본어, 한자 -> [OTH]
+        sentence에서 entity 앞뒤로 [{S|O}:{type}] 태그 달아줘 entity임을 상세하게 명시하기
         """
         # [{S|O}:{type}] 태크 달아주기
         new_sentence = []
@@ -253,11 +246,16 @@ class DataCleaning():
             new_sentence.append(sentence)
         df['sentence'] = new_sentence
 
-        # OTH 태그 달아주기
+        return df
+    
+    def add_others_tokens(self, df):
+        """
+        sentence에서 일본어와 한자를 [OTH] 토큰으로 바꾸기
+        """
         df['sentence'].replace(r'[ぁ-ゔァ-ヴー々〆〤一-龥]+', '[OTH]', regex=True, inplace=True)
 
         return df
-    
+
     def stop_words(self, df):
         """
         정적 데이터로 만들어진 불용어 리스트를 기반으로 입력 데이터의 불용어 제거하기
