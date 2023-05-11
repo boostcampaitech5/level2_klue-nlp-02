@@ -206,6 +206,29 @@ class DataCleaning():
                 df.loc[i, 'object_entity'] = hangulize(df.loc[i, 'object_entity'], language)
         return df
 
+    def entity_mask(self, df):
+        """ sentence 컬럼에서 subject_entity와 object_entity에 마스킹 처리(index 기준으로)
+        subject_entity → [SUB] 마스킹
+        object_entity → [OB] 마스킹
+        
+        Note: <데이터 예시>
+        〈Something〉는 조지 해리슨이 쓰고 비틀즈가 1969년 앨범 《Abbey Road》에 담은 노래다.
+            ↓
+        〈Something〉는 [OB]이 쓰고 [SUB]가 1969년 앨범 《Abbey Road》에 담은 노래다.
+        
+        Arguments:
+        df: entity_mask를 수행하고자 하는 DataFrame
+        
+        Return:
+        df: entity_mask 작업이 완료된 DataFrame
+        """
+        for idx, row in df.iterrows():
+            if row['subject_start_idx']<row['object_start_idx']:
+                df.loc[idx,'sentence']=row['sentence'][:row['subject_start_idx']]+'[SUB]'+row['sentence'][row['subject_end_idx']+1:row['object_start_idx']]+'[OB]'+row['sentence'][row['object_end_idx']+1:]
+            else:
+                df.loc[idx,'sentence']=row['sentence'][:row['object_start_idx']]+'[OB]'+row['sentence'][row['object_end_idx']+1:row['subject_start_idx']]+'[SUB]'+row['sentence'][row['subject_end_idx']+1:]
+        return df
+
 
 class DataAugmentation():
     """
