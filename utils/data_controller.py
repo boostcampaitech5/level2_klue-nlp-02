@@ -6,6 +6,7 @@ import pytorch_lightning as pl
 from sklearn.model_selection import train_test_split
 from tqdm.auto import tqdm
 from torch.utils.data import Dataset, DataLoader
+from hanspell import spell_checker
 
 class Dataset(Dataset):
     """
@@ -176,6 +177,32 @@ class DataCleaning():
             df[column] = word_list
             for key in ['start_idx', 'end_idx', 'type']:
                 df[f"{type_entity}_{key}"] = eval(f"{key}_list")
+        
+        return df
+    
+    """
+    Spell check 코드
+    """
+
+    def dc_hanspell(self, df):
+        """ sentence, subject_entity, object_entity spell check (띄어쓰기도 해 줌)
+            hanspell 라이브러리 사용 : https://github.com/ssut/py-hanspell
+        
+        Note: <데이터 예시>
+        진도군은 진도개를 보기 위해 찾아온 관람객들에게 더욱 흥미롭고 즐거움을 선사하기 위해 ▲팔백리길을 돌아온 백구 생가 토피어리 조형물 ▲어로(犬수영장)수렵장 ▲진도개 애견 캠핑장 등도 운영하고 있다.	
+        ↓
+        진도군은 진돗개를 보기 위해 찾아온 관람객들에게 더욱 흥미롭고 즐거움을 선사하기 위해 ▲팔백 리 길을 돌아온 백구 생가 토피어리 조형물 ▲어로(犬 수영장) 수렵장 ▲진돗개 애견 캠핑장 등도 운영하고 있다.
+            
+        Arguments:
+        df: Spell check를 수행하고자 하는 DataFrame
+        
+        Return:
+        df: Spell check 작업이 완료된 DataFrame
+        """
+        for type_entity in ['sentence','subject_entity', 'object_entity']:
+
+            for i in range(len(df)):
+                df.loc[ i, type_entity ] = spell_checker.check(df.loc[ i, type_entity ]).checked
         
         return df
 
