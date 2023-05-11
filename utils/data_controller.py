@@ -5,13 +5,13 @@ import pytorch_lightning as pl
 
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset, DataLoader
-from konlpy.tag import Okt
-from pykospacing import Spacing
-from hanspell import spell_checker
-from pororo import Pororo
+# from konlpy.tag import Okt
+# from pykospacing import Spacing
+# from hanspell import spell_checker
+# from pororo import Pororo
 
 
-from hangulize import hangulize
+# from hangulize import hangulize
 import re
 
 class Dataset(Dataset):
@@ -19,9 +19,10 @@ class Dataset(Dataset):
     Dataloader에서 불러온 데이터를 Dataset으로 만들기
     """
 
-    def __init__(self, inputs, targets=[]):
+    def __init__(self, inputs, targets=[], sub_obj_types=[]):
         self.inputs = inputs
         self.targets = targets
+        self.sub_obj_types = sub_obj_types
 
     def __getitem__(self, idx):
         inputs = {key: val[idx].clone().detach()
@@ -29,8 +30,9 @@ class Dataset(Dataset):
 
         if self.targets:
             targets = torch.tensor(self.targets[idx])
-
-            return inputs, targets
+            sub_obj_types = tuple(self.sub_obj_types.iloc[idx])
+            
+            return inputs, targets, sub_obj_types
         else:
             return inputs
 
@@ -109,7 +111,7 @@ class Dataloader(pl.LightningDataModule):
             val_inputs = self.tokenizing(val_x)
             val_targets = [self.label2num[label] for label in val_y]
 
-            return (train_inputs, train_targets), (val_inputs, val_targets)
+            return (train_inputs, train_targets, train_x[['subject_type', 'object_type']]), (val_inputs, val_targets, val_x[['subject_type', 'object_type']])
         else:
             x = DC.process(x)
 
@@ -123,8 +125,8 @@ class Dataloader(pl.LightningDataModule):
             # 학습 데이터 준비
             train, val = self.preprocessing(self.train_df, train=True)
             
-            self.train_dataset = Dataset(train[0], train[1])
-            self.val_dataset = Dataset(val[0], val[1])
+            self.train_dataset = Dataset(train[0], train[1], train[2])
+            self.val_dataset = Dataset(val[0], val[1], val[2])
         else:
             # 평가 데이터 호출
             predict_inputs = self.preprocessing(self.predict_x)
