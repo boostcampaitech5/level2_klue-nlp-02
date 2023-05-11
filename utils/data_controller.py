@@ -7,6 +7,7 @@ from sklearn.model_selection import train_test_split
 from tqdm.auto import tqdm
 from torch.utils.data import Dataset, DataLoader
 
+
 class Dataset(Dataset):
     """
     Dataloader에서 불러온 데이터를 Dataset으로 만들기
@@ -40,7 +41,6 @@ class Dataloader(pl.LightningDataModule):
         super(Dataloader, self).__init__()
         self.CFG = CFG
         self.tokenizer = tokenizer
-        
         train_x, train_y, predict_x = load_data()
         train_x, val_x, train_y, val_y = train_test_split(train_x, train_y,
                                                           stratify=train_y,
@@ -61,14 +61,14 @@ class Dataloader(pl.LightningDataModule):
 
     def tokenizing(self, x):
         """ 토크나이징 함수
-        
-        Note:   두 entity를 [SEP]토큰으로 이어붙인 리스트와 
+
+        Note:   두 entity를 [SEP]토큰으로 이어붙인 리스트와
                 원래 x['sentence'] 리스트를 토크나이저에 인자로 집어넣습니다.
                 inputs는 따라서 input_ids, attention_mask, token_type_ids가 각각 포함된 배열형태로 구성됩니다.
-                
+
         Arguments:
         x: pd.DataFrame
-        
+
         Returns:
         inputs: Dict({'input_ids', 'token_type_ids', 'attention_mask'}), 각 tensor(num_data, max_length)
         """
@@ -100,7 +100,7 @@ class Dataloader(pl.LightningDataModule):
         # 텍스트 데이터 토큰화
         inputs = self.tokenizing(x)
         targets = [self.label2num[label] for label in y]
-        
+
         return inputs, targets
 
     def setup(self, stage='fit'):
