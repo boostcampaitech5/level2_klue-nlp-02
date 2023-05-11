@@ -11,6 +11,9 @@ from hanspell import spell_checker
 from pororo import Pororo
 
 
+from hangulize import hangulize
+import re
+
 class Dataset(Dataset):
     """
     Dataloader에서 불러온 데이터를 Dataset으로 만들기
@@ -189,6 +192,52 @@ class DataCleaning():
                 df[f"{type_entity}_{key}"] = eval(f"{key}_list")
         
         return df
+    
+    def pronounce_japan(self, df):
+        """ sentence, subject_entity, object_entity 컬럼에서 일본어 발음을 한글로 변환
+        hangulize 라이브러리 사용
+        
+        Note: <데이터 예시>
+        みなみ → 미나미
+        
+        Arguments:
+        df: pronounce_japan을 수행하고자 하는 DataFrame
+        
+        Return:
+        df: pronounce_japan 작업이 완료된 DataFrame
+        """
+        pattern = re.compile(r'[ぁ-ゔ]+|[ァ-ヴー]+[々〆〤]')
+        language = 'jpn'
+        for i in range(len(df)):
+            if pattern.search(df.loc[i,'sentence']):
+                df.loc[i, 'sentence'] = hangulize(df.loc[i, 'sentence'], language)
+            if pattern.search(df.loc[i,'subject_entity']):
+                df.loc[i, 'subject_entity'] = hangulize(df.loc[i, 'subject_entity'], language)
+            if pattern.search(df.loc[i,'object_entity']):
+                df.loc[i, 'object_entity'] = hangulize(df.loc[i, 'object_entity'], language)
+        return df
+
+    def entity_mask(self, df):
+        """ sentence 컬럼에서 subject_entity와 object_entity에 마스킹 처리(index 기준으로)
+        subject_entity → [SUB] 마스킹
+        object_entity → [OBJ] 마스킹
+        
+        Note: <데이터 예시>
+        〈Something〉는 조지 해리슨이 쓰고 비틀즈가 1969년 앨범 《Abbey Road》에 담은 노래다.
+            ↓
+        〈Something〉는 [OBJ]이 쓰고 [SUB]가 1969년 앨범 《Abbey Road》에 담은 노래다.
+        
+        Arguments:
+        df: entity_mask를 수행하고자 하는 DataFrame
+        
+        Return:
+        df: entity_mask 작업이 완료된 DataFrame
+        """
+        for idx, row in df.iterrows():
+            if row['subject_start_idx']<row['object_start_idx']:
+                df.loc[idx,'sentence']=row['sentence'][:row['subject_start_idx']]+'[SUB]'+row['sentence'][row['subject_end_idx']+1:row['object_start_idx']]+'[OBJ]'+row['sentence'][row['object_end_idx']+1:]
+            else:
+                df.loc[idx,'sentence']=row['sentence'][:row['object_start_idx']]+'[OBJ]'+row['sentence'][row['object_end_idx']+1:row['subject_start_idx']]+'[SUB]'+row['sentence'][row['subject_end_idx']+1:]
     
     def remove_duplicated(self, df):
         """
