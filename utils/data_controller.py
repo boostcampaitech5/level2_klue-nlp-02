@@ -91,11 +91,15 @@ class Dataloader(pl.LightningDataModule):
     def preprocessing(self, x, y=[], train=False):
         DC = DataCleaning(self.CFG['select_DC'])
         DA = DataAugmentation(self.CFG['select_DA'])
-
+        
+        if type(y) != list:
+            x = pd.concat([x, y], axis = 1)
+            
         x = DC.process(x)
         # 데이터 증강
         if train:
             x = DA.process(x)
+            y = x['label']
 
         # 텍스트 데이터 토큰화
         inputs = self.tokenizing(x)
@@ -106,6 +110,7 @@ class Dataloader(pl.LightningDataModule):
     def setup(self, stage='fit'):
         if stage == 'fit':
             # 학습 데이터 준비
+            breakpoint()
             train_inputs, train_targets = self.preprocessing(
                 self.train_x, self.train_y, train=True)
             self.train_dataset = Dataset(train_inputs, train_targets)
@@ -178,6 +183,56 @@ class DataCleaning():
                 df[f"{type_entity}_{key}"] = eval(f"{key}_list")
         
         return df
+    
+    def normalize_class(self, df):
+        """ 특정 label에 대해 들어올 수 없는 entity_type이 기재되어있는 경우,
+        해당 type을 올바른 entity_type으로 바꾸어 주고자 함.
+        
+        Note: 어떤 label에 대해 어떤 entity_type이 허용되는지는 CJW_vis.ipynb 참고바람
+
+        Arguments:
+        df: (entity_parsing이 끝난) normalize_class을 수행하고자 하는 DataFrame
+
+        Return:
+        df: normalize_class 작업이 완료된 DataFrame
+        """
+
+        if 'labels' not in df.columns:
+            return df
+        allowed_obj_for_class = \
+        {'org:founded_by' : {'allowed' : set(['PER', 'ORG']), 'change_into' : 'ORG'},
+        'org:member_of' : {'allowed' : set(['ORG', 'LOC', 'POH']), 'change_into' : 'ORG'},
+        'org:members' : {'allowed' : set(['ORG', 'LOC', 'POH']), 'change_into' : 'ORG'},
+        'org:place_of_headquarters' : {'allowed' : set(['ORG', 'LOC', 'POH']), 'change_into' : 'LOC'},
+        'org:political/religious_affiliation' : {'allowed' : set(['ORG', 'LOC', 'POH']), 'change_into' : 'ORG'},
+        'org:product' : {'allowed' : set(['ORG', 'LOC', 'POH', 'PER']), 'change_into' : 'POH'},
+        'org:top_members/employees' : {'allowed' : set(['ORG', 'LOC', 'POH', 'PER']), 'change_into' : 'PER'},
+        'per:alternate_names' : {'allowed' : set(['ORG','POH', 'PER']), 'change_into' : 'PER'},
+        'per:children' : {'allowed' : set(['PER']), 'change_into' : 'PER'},
+        'per:colleagues' : {'allowed' : set(['PER', 'POH', 'ORG']), 'change_into' : 'PER'},
+        'per:date_of_birth' : {'allowed' : set(['DAT']), 'change_into' : 'DAT'},
+        'per:date_of_death' : {'allowed' : set(['DAT']), 'change_into' : 'DAT'},
+        'per:employee_of' : {'allowed' : set(['PER', 'POH', 'ORG', 'LOC']), 'change_into' : 'ORG'},
+        'per:origin' : {'allowed' : set(['LOC', 'POH', 'DAT', 'ORG']), 'change_into' : 'ORG'},
+        'per:other_family' : {'allowed' : set(['PER', 'POH']), 'change_into' : 'POH'},
+        'per:parents' : {'allowed' : set(['PER']), 'change_into' : 'PER'},
+        'per:place_of_birth' : {'allowed' : set(['LOC']), 'change_into' : 'LOC'},
+        'per:place_of_death' : {'allowed' : set(['LOC']), 'change_into' : 'LOC'},
+        'per:place_of_residence' : {'allowed' : set(['LOC', 'ORG', 'POH', 'DAT']), 'change_into' : 'LOC'},
+        'per:product' : {'allowed' : set(['POH']), 'change_into' : 'POH'},
+        'per:religion' : {'allowed' : set(['POH', 'ORG']), 'change_into' : 'ORG'},
+        'per:siblings' : {'allowed' : set(['PER']), 'change_into' : 'PER'},
+        'per:spouse' : {'allowed' : set(['PER']), 'change_into' : 'PER'},
+        'per:title' : {'allowed' : set(['PER', 'POH']), 'change_into' : 'POH'}
+        }
+            
+        for label, obj_info in allowed_obj_for_class.items():
+            df.loc[(df['label'] == label) & (~df['object_type'].isin(obj_info['allowed'])), 'object_type'] = obj_info['change_into']
+
+        df.loc[df['label'].str.startswith('per'), 'subject_type'] = 'PER'
+        df.loc[df['label'].str.startswith('org'), 'subject_type'] = 'ORG'
+                
+        return df
 
 
 class DataAugmentation():
@@ -199,10 +254,56 @@ class DataAugmentation():
             df = pd.concat([df, aug_df])
 
         return df
-
+    
     """
     data augmentation 코드
     """
+    
+    def swap_sentence(self, df):
+        """ subject/object swap을 통해 데이터 증강이 가능.
+        그러므로 swap이 가능한 문장은 swap을 수행, 데이터를 증강하고자 함
+        Note: <swap이 가능한 문장의 classes> {
+            colleagues -> colleagues
+            other_family -> other_family
+            siblings -> siblings
+            spouse -> spouse
+
+            alternate_names -> alternate_names
+            ------------------------------
+            children <-> parents
+            members <-> member_of
+
+            top_members/employees <-> employee_of
+            }
+
+        Arguments:
+        df: (entity_parsing이 끝난) 문장 swap augmentation을 수행하고자 하는 DataFrame
+
+        Return:
+        df: augmentation 작업이 완료된 DataFrame
+        """
+        
+        auto_augmentation = set(['org:alternate_names',
+                                'per:alternate_names',
+                                'per:colleagues',
+                                'per:other_family',
+                                'per:siblings',
+                                'per:spouse'])
+        cross_augmentation = {'per:children' : 'per:parents',
+                            'per:parents' : 'per:children',
+                            'org:members' : 'org:member_of',
+                            'org:member_of' : 'org:members',
+                            'org:top_members/employees' : 'per:employee_of',
+                            'per:employee_of' : 'org:top_members/employees'}
+        auto_df = df[df['label'].isin(auto_augmentation)]
+        cross_df = df[df['label'].isin(cross_augmentation.keys())]
+
+        auto_df['subject_entity'], auto_df['object_entity'] = auto_df['object_entity'].copy(), auto_df['subject_entity'].copy()
+
+        cross_df['subject_entity'], cross_df['object_entity'] = cross_df['object_entity'].copy(), cross_df['subject_entity'].copy()
+        cross_df['label'] = cross_df['label'].map(cross_augmentation)
+
+        return pd.concat([auto_df, cross_df], ignore_index=True)
 
 
 def load_data():
