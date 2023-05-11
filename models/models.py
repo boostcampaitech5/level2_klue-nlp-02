@@ -85,8 +85,8 @@ class Model(pl.LightningModule):
             attention_mask=x['attention_mask'],
             token_type_ids=x['token_type_ids']
         )
-        # loss = self.loss_func(logits, y)   # val_loss 계산 안 해도 될 것 같아서 주석 처리를 해 놨어요
-        # self.log("val_loss", loss)
+        loss = self.loss_func(logits, y)
+        self.log("val_loss", loss)
 
         metric = metrics.compute_metrics(
             F.softmax(logits, dim=-1), y)
