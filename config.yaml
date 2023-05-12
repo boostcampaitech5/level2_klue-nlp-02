@@ -21,6 +21,7 @@ train:
   focal_loss_scale: 1 # focal_loss의 scale을 조정합니다
 select_DC:
   - remove_duplicated
+  # - normalize_class
   - add_entity_tokens_base
   # - add_entity_tokens_detail
   - add_others_tokens
