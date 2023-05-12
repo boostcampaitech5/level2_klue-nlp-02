@@ -442,7 +442,7 @@ class DataCleaning():
             df: entitiy로 들어가는 이름 제외한 사람 이름을 [PER]로 변환하는 작업이 완료된 DataFrame
         """
 
-        ner = Pororo(task="ner", lang="ko")   # ner 수행해 주는 pororo기능 object화
+        ner = Pororo(task="ner", lang="ko")  # ner 수행해 주는 pororo기능 object화
 
         def per_change(sen):     
             final_sen = ''
