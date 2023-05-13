@@ -32,7 +32,7 @@ if __name__ == "__main__":
     dataloader = data_controller.ADVSDataloader(tokenizer)
     
     LM = AutoModelForSequenceClassification.from_pretrained(
-        pretrained_model_name_or_path='klue/roberta-large', num_labels=2)
+        pretrained_model_name_or_path='klue/roberta-base', num_labels=2)
     LM.resize_token_embeddings(len(tokenizer))
     
     
