@@ -22,10 +22,9 @@ select_DC:
   - add_entity_tokens_base
   # - add_entity_tokens_detail
   - add_others_tokens
-  # - spacing
-  # - stop_words
 select_DA:
 wandb:
   id: 아이디
 option:
   early_stop: True
+  short_tokenizing: False
