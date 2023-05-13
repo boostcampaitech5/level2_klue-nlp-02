@@ -9,7 +9,7 @@ import wandb
 from models.models import Model
 from models.models import TAPTModel
 from utils import utils, data_controller
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, AutoModelForMaskedLM
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.loggers import WandbLogger
@@ -41,20 +41,37 @@ if __name__ == "__main__":
         'additional_special_tokens': special_tokens_list
     })
     dataloader = data_controller.Dataloader(tokenizer, CFG)
-    LM = AutoModelForSequenceClassification.from_pretrained(
-        pretrained_model_name_or_path=CFG['train']['model_name'], num_labels=30)
-    LM.resize_token_embeddings(len(tokenizer))
     
     if CFG['train']['TAPT']:
         # Pretrain on combined train and test data (TAPT)
-        tapt_dataloader = data_controller.TAPTDataloader(tokenizer, CFG)  # You'll need to implement this
-        tapt_model = TAPTModel(LM, CFG)  # You'll need to implement this
+        if not os.path.exists("./tapt_model"):
+            LM = AutoModelForMaskedLM.from_pretrained(CFG['train']['model_name']) 
+            tapt_dataloader = data_controller.TAPTDataloader(tokenizer, CFG)  # You'll need to implement this
+            tapt_model = TAPTModel(LM, CFG)  # You'll need to implement this
 
-        tapt_trainer = pl.Trainer(gpus=1, max_epochs=CFG['train']['tapt_epochs'])
-        tapt_trainer.fit(tapt_model, tapt_dataloader)
+            checkpoint_callback = ModelCheckpoint(
+                        monitor='val_loss',
+                        dirpath='./tapt_model',
+                        filename='best_model-{epoch:02d}-{val_loss:.2f}',
+                        save_top_k=1,
+                        mode='min',
+                    )
+            early_stopping = EarlyStopping(monitor='val_loss',
+                                           patience=5,
+                                           mode='min',
+                                           verbose=True)
 
-        # Fine-tune on actual training data
-        LM = tapt_model.model  # Get the model from TAPT phase
+            tapt_trainer = pl.Trainer(accelerator='gpu',
+                                      max_epochs=100,
+                                      callbacks = [early_stopping, checkpoint_callback])
+            tapt_trainer.fit(tapt_model, tapt_dataloader)
+            # Fine-tune on actual training data
+        LM = AutoModelForSequenceClassification.from_pretrained("./tapt_model", num_labels=30)
+            
+    else:    
+        LM = AutoModelForSequenceClassification.from_pretrained(
+            pretrained_model_name_or_path=CFG['train']['model_name'], num_labels=30)
+        LM.resize_token_embeddings(len(tokenizer))
     
     
     model = Model(LM, CFG)

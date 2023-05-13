@@ -16,6 +16,8 @@ use_config.yaml
 results/
 .netrc
 data_analysis/CJW_viz.ipynb
+wandb
+ADVS
 
 lightning_logs
 nohup.out
