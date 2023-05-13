@@ -7,6 +7,7 @@ import pytorch_lightning as pl
 import wandb
 
 from models.models import Model
+from models.models import TAPTModel
 from utils import utils, data_controller
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from pytorch_lightning.callbacks import ModelCheckpoint
@@ -43,6 +44,19 @@ if __name__ == "__main__":
     LM = AutoModelForSequenceClassification.from_pretrained(
         pretrained_model_name_or_path=CFG['train']['model_name'], num_labels=30)
     LM.resize_token_embeddings(len(tokenizer))
+    
+    if CFG['train']['TAPT']:
+        # Pretrain on combined train and test data (TAPT)
+        tapt_dataloader = data_controller.TAPTDataloader(tokenizer, CFG)  # You'll need to implement this
+        tapt_model = TAPTModel(LM, CFG)  # You'll need to implement this
+
+        tapt_trainer = pl.Trainer(gpus=1, max_epochs=CFG['train']['tapt_epochs'])
+        tapt_trainer.fit(tapt_model, tapt_dataloader)
+
+        # Fine-tune on actual training data
+        LM = tapt_model.model  # Get the model from TAPT phase
+    
+    
     model = Model(LM, CFG)
     # check point
     checkpoint = ModelCheckpoint(monitor='val_micro_f1_Score',

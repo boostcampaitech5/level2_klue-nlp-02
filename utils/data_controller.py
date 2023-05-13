@@ -140,6 +140,100 @@ class Dataloader(pl.LightningDataModule):
 
     def predict_dataloader(self):
         return DataLoader(self.predict_dataset, batch_size=self.CFG['train']['batch_size'])
+    
+class TAPTDataloader(pl.LightningDataModule):
+    """
+    TAPT 훈련을 위한 데이터 로더
+    """
+
+    def __init__(self, tokenizer, CFG):
+        super(Dataloader, self).__init__()
+        self.CFG = CFG
+        self.tokenizer = tokenizer
+        
+        train_df, test_df = load_data()
+        train_df['comes_from'] = 0
+        test_df['comes_from'] = 1
+        self.train_df = pd.concat([train_df, test_df])
+
+        self.train_dataset = None
+        self.val_dataset = None
+
+    def tokenizing(self, x):
+        """ 토크나이징 함수
+
+        Note:   두 entity를 [SEP]토큰으로 이어붙인 리스트와
+                원래 x['sentence'] 리스트를 토크나이저에 인자로 집어넣습니다.
+                inputs는 따라서 input_ids, attention_mask, token_type_ids가 각각 포함된 배열형태로 구성됩니다.
+
+        Arguments:
+        x: pd.DataFrame
+
+        Returns:
+        inputs: Dict({'input_ids', 'token_type_ids', 'attention_mask'}), 각 tensor(num_data, max_length)
+        """
+        concat_entity = []
+        for sub_ent, sub_type, obj_ent, obj_type in zip(x['subject_entity'], x['subject_type'], x['object_entity'], x['object_entity']):
+            concat_entity.append(obj_ent + " [SEP] " + f"[S:{obj_type}]" + " [SEP] " + sub_ent + " [SEP] " + f"[S:{sub_type}]")
+
+        inputs = self.tokenizer(
+            concat_entity,
+            list(x['sentence']),
+            return_tensors='pt',
+            padding=True,
+            truncation=True,
+            max_length=self.CFG['train']['token_max_len'],
+            add_special_tokens=True,
+        )
+
+        return inputs
+
+    def preprocessing(self, x, train=False):
+        if train:
+
+            train_x = x.drop(['comes_from'], axis=1)
+            train_y = x['comes_from']
+
+            train_x, val_x, train_y, val_y = train_test_split(train_x, train_y,
+                                                              stratify=train_y,
+                                                              test_size=self.CFG['train']['test_size'],
+                                                              shuffle=self.CFG['train']['shuffle'],
+                                                              random_state=self.CFG['seed'])
+            
+            train_inputs = self.tokenizing(train_x)
+            train_targets = train_y
+
+            val_inputs = self.tokenizing(val_x)
+            val_targets = val_y
+
+            return (train_inputs, train_targets), (val_inputs, val_targets, val_x[['subject_type', 'object_type']])
+        else:
+
+            # 텍스트 데이터 토큰화
+            test_inputs = self.tokenizing(x)
+        
+            return test_inputs
+
+    def setup(self, stage='fit'):
+        if stage == 'fit':
+            # 학습 데이터 준비
+            train, val = self.preprocessing(self.train_df, train=True)
+            
+            self.train_dataset = Dataset(train[0], train[1], train[2])
+            self.val_dataset = Dataset(val[0], val[1], val[2])
+        else:
+            # 평가 데이터 호출
+            predict_inputs = self.preprocessing(self.predict_x)
+            self.predict_dataset = Dataset(predict_inputs)
+
+    def train_dataloader(self):
+        return DataLoader(self.train_dataset, batch_size=self.CFG['train']['batch_size'], shuffle=self.CFG['train']['shuffle'])
+    
+    def val_dataloader(self):
+        return DataLoader(self.val_dataset, batch_size=self.CFG['train']['batch_size'])
+
+    def predict_dataloader(self):
+        return DataLoader(self.predict_dataset, batch_size=self.CFG['train']['batch_size'])
 
 
 class DataCleaning():
