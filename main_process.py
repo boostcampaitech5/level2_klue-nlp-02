@@ -71,8 +71,8 @@ if __name__ == "__main__":
     else:    
         LM = AutoModelForSequenceClassification.from_pretrained(
             pretrained_model_name_or_path=CFG['train']['model_name'], num_labels=30)
-        LM.resize_token_embeddings(len(tokenizer))
-    
+        
+    LM.resize_token_embeddings(len(tokenizer))
     
     model = Model(LM, CFG)
     # check point

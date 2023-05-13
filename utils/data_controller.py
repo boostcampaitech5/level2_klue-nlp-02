@@ -5,6 +5,7 @@ import pytorch_lightning as pl
 
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset, DataLoader
+from transformers import DataCollatorForLanguageModeling
 # from konlpy.tag import Okt
 # from pykospacing import Spacing
 # from hanspell import spell_checker
@@ -272,17 +273,12 @@ class TAPTDataloader(pl.LightningDataModule):
         self.val_dataset = None
 
     def tokenizing(self, x):
-        concat_entity = []
-        for sub_ent, sub_type, obj_ent, obj_type in zip(x['subject_entity'], x['subject_type'], x['object_entity'], x['object_entity']):
-            concat_entity.append(obj_ent + " [SEP] " + f"[S:{obj_type}]" + " [SEP] " + sub_ent + " [SEP] " + f"[S:{sub_type}]")
-
         inputs = self.tokenizer(
-            concat_entity,
             list(x['sentence']),
             return_tensors='pt',
             padding=True,
             truncation=True,
-            max_length=10,
+            max_length=170,
             add_special_tokens=True,
         )
 
@@ -303,18 +299,16 @@ class TAPTDataloader(pl.LightningDataModule):
         if stage == 'fit':
             # 학습 데이터 준비
             train, val = self.preprocessing(self.train_df)
-            self.train_dataset = ADVSDataset(train)
-            self.val_dataset = ADVSDataset(val)
-        else:
-            # 평가 데이터 호출
-            predict_inputs = self.preprocessing(self.predict_x)
-            self.predict_dataset = ADVSDataset(predict_inputs)
+            self.train_dataset = TAPTDataset(train)
+            self.val_dataset = TAPTDataset(val)
 
     def train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=64, shuffle=True)
+        return DataLoader(self.train_dataset, batch_size=64, shuffle=True, collate_fn = DataCollatorForLanguageModeling(
+    tokenizer = self.tokenizer, mlm=True, mlm_probability=0.15))
     
     def val_dataloader(self):
-        return DataLoader(self.val_dataset, batch_size=64, shuffle=True)
+        return DataLoader(self.val_dataset, batch_size=64, shuffle=True,collate_fn = DataCollatorForLanguageModeling(
+    tokenizer = self.tokenizer, mlm=True, mlm_probability=0.15))
 
 
 class DataCleaning():
