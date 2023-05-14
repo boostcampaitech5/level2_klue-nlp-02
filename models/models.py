@@ -6,6 +6,43 @@ import pytorch_lightning as pl
 from utils import metrics
 
 
+def Adaptive_Threshold_loss(logits, labels):
+    """
+    Note:       ALTOP - Adaptive Threshold loss를 계산합니다.
+                TH label(기준)을 설정하여 Positive label logit은 더 높게, negative label logits은 더 낮도록 패널티를 줍니다.
+                참고 링크: https://arxiv.org/pdf/2010.11304.pdf
+
+    Arguments:
+    logits: (batch, num_classes)
+    labels: (batch, )
+    
+    Return:
+    loss:   (batch, ), torch.tensor([scalar])
+    """
+    
+    # 1. Threshold 라벨 설정: TH label = no_relation -> no_relation 보다는 logit 값이 높도록 설정
+    labels = F.one_hot(labels, num_classes=logits.size(-1))
+    threshold_label = torch.zeros_like(labels, dtype=torch.float).to(labels)   # (batch, num_classes)
+    threshold_label[:, 0] = 1                   # TH label = no_relation
+    labels[:, 0] = 0
+
+    positive_mask = labels + threshold_label    # (batch, num_classes) -> 원래 label 과 같다.
+    negative_mask = 1 - labels                  # (batch, num_classes) -> 정답 label이 아닌 다른 모든 label이 1로 설정된다.
+    
+    # 2. loss = l1 + l2
+    logit1 = logits - (1 - positive_mask) * 1e30
+    loss1 = -(F.log_softmax(logit1, dim=-1) * labels).sum(1)
+    
+    logit2 = logits - (1 - negative_mask) * 1e30
+    loss2 = -(F.log_softmax(logit2, dim=-1) * threshold_label).sum(1)
+    
+    # 3. Sum
+    loss = loss1 + loss2
+    loss = loss.mean()
+    
+    return loss
+
+
 class Model(pl.LightningModule):
     def __init__(self, LM, CFG):
         super().__init__()
@@ -33,7 +70,9 @@ class Model(pl.LightningModule):
             attention_mask=x['attention_mask'],
             token_type_ids=x['token_type_ids']
         )
-        loss = self.loss_func(logits, y)
+        loss = self.loss_func(logits, y) if not self.CFG['train']['Adaptive_Threshold_loss'] \
+        else Adaptive_Threshold_loss(logits, y)
+        
         self.log("train_loss", loss)
 
         return loss
