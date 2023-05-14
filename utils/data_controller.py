@@ -216,28 +216,6 @@ class DataCleaning():
             if pattern.search(df.loc[i,'object_entity']):
                 df.loc[i, 'object_entity'] = hangulize(df.loc[i, 'object_entity'], language)
         return df
-
-    def entity_mask(self, df):
-        """ sentence 컬럼에서 subject_entity와 object_entity에 마스킹 처리(index 기준으로)
-        subject_entity → [SUB] 마스킹
-        object_entity → [OBJ] 마스킹
-        
-        Note: <데이터 예시>
-        〈Something〉는 조지 해리슨이 쓰고 비틀즈가 1969년 앨범 《Abbey Road》에 담은 노래다.
-            ↓
-        〈Something〉는 [OBJ]이 쓰고 [SUB]가 1969년 앨범 《Abbey Road》에 담은 노래다.
-        
-        Arguments:
-        df: entity_mask를 수행하고자 하는 DataFrame
-        
-        Return:
-        df: entity_mask 작업이 완료된 DataFrame
-        """
-        for idx, row in df.iterrows():
-            if row['subject_start_idx']<row['object_start_idx']:
-                df.loc[idx,'sentence']=row['sentence'][:row['subject_start_idx']]+'[SUB]'+row['sentence'][row['subject_end_idx']+1:row['object_start_idx']]+'[OBJ]'+row['sentence'][row['object_end_idx']+1:]
-            else:
-                df.loc[idx,'sentence']=row['sentence'][:row['object_start_idx']]+'[OBJ]'+row['sentence'][row['object_end_idx']+1:row['subject_start_idx']]+'[SUB]'+row['sentence'][row['subject_end_idx']+1:]
     
     def remove_duplicated(self, df):
         """
@@ -338,6 +316,32 @@ class DataCleaning():
         lib = Spacing()
 
         df['sentence'] = df['sentence'].apply(lambda x: lib(x.replace(" ", "")))
+
+    def entity_mask_detail(self, df):
+        """
+        sentence, subject_entity, object_entity 컬럼에서 subject_entity와 object_entity에 마스킹 처리
+        [S:{type}] subject_entity [/S:{type}] → [SUB] 마스킹
+        [O:{type}] object_entity [/O:{type}] → [OBJ] 마스킹
+        
+        *** add_entity_tokens_detail 함수를 먼저 적용해줘야 함! ***
+
+        Note: <데이터 예시>
+        〈Something〉는 [O:PER] 조지 해리슨 [/O:PER] 이 쓰고 [S:ORG] 비틀즈 [/S:ORG] 가 1969년 앨범 《Abbey Road》에 담은 노래다.
+            ↓
+        〈Something〉는 [OBJ] 이 쓰고 [SUB] 가 1969년 앨범 《Abbey Road》에 담은 노래다.
+        
+        Arguments:
+        df: add_entity_tokens_detail 함수를 적용한 DataFrame
+        
+        Return:
+        df: subject_entity와 object_entity에 마스킹 처리 작업이 완료된 DataFrame
+        """
+        df['sentence']=df['sentence'].apply(lambda x: re.sub('\[S:.+?].+?\[/S:.+?]','[SUB]',x))
+        df['sentence']=df['sentence'].apply(lambda x: re.sub('\[O:.+?].+?\[/O:.+?]','[OBJ]',x))
+        df['subject_entity']='[SUB]'
+        df['object_entity']='[OBJ]'
+
+        return df
 
     """
     Spell check 코드
@@ -482,8 +486,8 @@ if __name__ == "__main__":
     test_df = pd.read_csv('./dataset/test/test_data.csv')
 
     # entity_parsing이 적용된 DataFrame 파일 만들기
-    new_train_df = DataCleaning([]).entity_parsing(train_df.copy(deep=True))
-    new_test_df = DataCleaning([]).entity_parsing(test_df.copy(deep=True))
+    #new_train_df = DataCleaning([]).entity_parsing(train_df.copy(deep=True))
+    #new_test_df = DataCleaning([]).entity_parsing(test_df.copy(deep=True))
 
-    new_train_df.to_csv('./dataset/new_train.csv', index=False)
-    new_test_df.to_csv('./dataset/new_test.csv', index=False)
+    #new_train_df.to_csv('./dataset/new_train.csv', index=False)
+    #new_test_df.to_csv('./dataset/new_test.csv', index=False)
