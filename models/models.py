@@ -188,7 +188,7 @@ class ADVSModel(pl.LightningModule):
         return probs.tolist()
 
     def configure_optimizers(self):
-        optimizer = self.optim(self.parameters(), lr=0.000001)
+        optimizer = self.optim(self.parameters(), lr=0.00001)
 
         return [optimizer]
     

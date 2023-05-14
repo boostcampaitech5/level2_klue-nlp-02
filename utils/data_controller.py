@@ -132,14 +132,51 @@ class Dataloader(pl.LightningDataModule):
             x = DC.process(x, train=True)
             x = DA.process(x)
 
-            train_x = x.drop(['label'], axis=1)
-            train_y = x['label']
+            if not self.CFG['train']['adverse_valid']:
+                train_x = x.drop(['label'], axis=1)
+                train_y = x['label']
+            
+                train_x, val_x, train_y, val_y = train_test_split(train_x, train_y,
+                                                                stratify=train_y,
+                                                                test_size=self.CFG['train']['test_size'],
+                                                                shuffle=self.CFG['train']['shuffle'],
+                                                                random_state=self.CFG['seed'])
+            else:
+                # Sort the dataframe by similarity score in descending order
+                df = x.sort_values(by='prob_1', ascending=False)
 
-            train_x, val_x, train_y, val_y = train_test_split(train_x, train_y,
-                                                              stratify=train_y,
-                                                              test_size=self.CFG['train']['test_size'],
-                                                              shuffle=self.CFG['train']['shuffle'],
-                                                              random_state=self.CFG['seed'])
+                # Define the validation size
+                valid_size = 0.2
+
+                # Initialize an empty dataframe for the validation set
+                valid_df = pd.DataFrame()
+
+                # For each unique label...
+                for label in df['label'].unique():
+                    # Filter the dataframe for the current label
+                    df_label = df[df['label'] == label]
+                    
+                    # Calculate the number of validation instances for the current label
+                    num_valid = int(len(df_label) * valid_size)
+                    
+                    # Add the instances with the highest similarity scores to the validation set
+                    valid_df = valid_df.append(df_label.iloc[:num_valid])
+                    
+                    # Remove these instances from the original dataframe
+                    df = df.drop(df_label.iloc[:num_valid].index)
+
+                # What remains in df is the training set
+                train_df = df
+
+                # Optionally, reset the indices of the train and validation dataframes
+                train_df = train_df.reset_index(drop=True)
+                valid_df = valid_df.reset_index(drop=True)
+                
+                train_inputs = train_df.drop(['label'], axis=1)
+                train_targets = train_df['label']
+                
+                val_inputs = valid_df.drop(['label'], axis=1)
+                val_targets = valid_df['label']
             
             train_inputs = self.tokenizing(train_x)
             train_targets = [self.label2num[label] for label in train_y]
