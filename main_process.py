@@ -39,7 +39,6 @@ if __name__ == "__main__":
     tokenizer.add_special_tokens({
         'additional_special_tokens': special_tokens_list
     })
-    tokenizer.add_tokens(['PER', 'LOC', 'POH', 'DAT', 'NOH', 'ORG'])  #  notSpecialToken을 위해
     
     dataloader = data_controller.Dataloader(tokenizer, CFG)
     LM = AutoModelForSequenceClassification.from_pretrained(
