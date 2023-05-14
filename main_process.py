@@ -41,9 +41,10 @@ if __name__ == "__main__":
     })
     dataloader = data_controller.Dataloader(tokenizer, CFG)
     LM = AutoModelForSequenceClassification.from_pretrained(
-        pretrained_model_name_or_path=CFG['train']['model_name'], num_labels=30)
+        pretrained_model_name_or_path=CFG['train']['model_name'], num_labels=30,
+        output_hidden_states=True, output_attentions=True)
     LM.resize_token_embeddings(len(tokenizer))
-    model = Model(LM, CFG)
+    model = Model(LM, tokenizer, CFG)
     # check point
     checkpoint = ModelCheckpoint(monitor='val_micro_f1_Score',
                                  save_top_k=CFG['train']['save_top_k'],
@@ -64,7 +65,7 @@ if __name__ == "__main__":
                          max_epochs=CFG['train']['epoch'],
                          default_root_dir=save_path,
                          log_every_n_steps=1,
-                         val_check_interval=0.5,           # 1 epoch 당 valid loss 2번 체크: 학습여부 빠르게 체크
+                         val_check_interval=0.25,           # 1 epoch 당 valid loss 2번 체크: 학습여부 빠르게 체크
                          logger=wandb_logger,
                          callbacks=callbacks)
 
