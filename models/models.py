@@ -67,7 +67,7 @@ class Model(pl.LightningModule):
                                   dropout = 0.1,
                                   batch_first = True,
                                   bidirectional = True) if self.CFG['train']['LSTM']['Do'] else None
-        self.fc = torch.nn.Linear(self.LM.model_config.hidden_size * 2, 30)
+        self.fc = torch.nn.Linear(self.LM.model_config.hidden_size * 2, 30) if self.CFG['train']['LSTM']['Do'] else None
 
     def forward(self, input_ids, attention_mask, token_type_ids):
         outputs = self.LM(
