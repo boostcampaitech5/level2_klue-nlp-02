@@ -435,6 +435,17 @@ class DataCleaning():
             row["sentence"] = f"@ * {subject_type} * {subject_entity} @와 # ^ {object_type} ^ {object_entity}의 관계 [SEP] " + row["sentence"]
         
         return df
+
+    def quering_with_detail(self, df):
+        """
+        add_entity_tokens_detail 뒤에 사용할 수 있는 버전의 quering           
+        From ->       〈Something〉는 # ^ PER ^ 조지 해리슨 # 이 쓰고 @ * ORG * 비틀즈 @ 가 1969년 앨범 《Abbey Road》에 담은 노래다.
+        To ->       @ * ORG * 비틀즈 @와 # ^ PER ^ 조지 해리슨 #의 관계 [SEP] 〈Something〉는 # ^ PER ^ 조지 해리슨 # 이 쓰고 @ * ORG * 비틀즈 @ 가 1969년 앨범 《Abbey Road》에 담은 노래다.
+        """
+        
+        # 아직 미구현
+        
+        return df
     
     def add_others_tokens(self, df):
         """
