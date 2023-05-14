@@ -17,6 +17,7 @@ train:
   patience: 5
   test_size: 0.2
   save_top_k: 3 # Inference할 top k개의 모델.
+  Adaptive_Threshold_loss: True
 select_DC:
   - remove_duplicated
   - add_entity_tokens_base
