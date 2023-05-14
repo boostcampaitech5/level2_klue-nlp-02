@@ -41,9 +41,9 @@ if __name__ == "__main__":
     })
     dataloader = data_controller.Dataloader(tokenizer, CFG)
     LM = AutoModelForSequenceClassification.from_pretrained(
-        pretrained_model_name_or_path=CFG['train']['model_name'], num_labels=30)
+        pretrained_model_name_or_path=CFG['train']['model_name'], num_labels=30, output_hidden_states=CFG['train']['LSTM']['Do'])
     LM.resize_token_embeddings(len(tokenizer))
-    model = Model(LM, CFG)
+    model = Model(LM, tokenizer, CFG)
     # check point
     checkpoint = ModelCheckpoint(monitor='val_micro_f1_Score',
                                  save_top_k=CFG['train']['save_top_k'],
