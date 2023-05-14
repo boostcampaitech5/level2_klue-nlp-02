@@ -317,6 +317,37 @@ class DataCleaning():
 
         df['sentence'] = df['sentence'].apply(lambda x: lib(x.replace(" ", "")))
 
+    def entity_mask_base(self, df):
+        """
+        sentence, subject_entity, object_entity 컬럼에서 subject_entity와 object_entity에 마스킹 처리
+        [ENT] subject_entity [/ENT] → [SUB] 마스킹
+        [ENT] object_entity [/ENT]→ [OBJ] 마스킹
+        
+        *** add_entity_tokens_base 함수를 먼저 적용해줘야 함! ***
+
+        Note: <데이터 예시>
+        〈Something〉는 [ENT] 조지 해리슨 [/ENT] 이 쓰고 [ENT] 비틀즈 [/ENT] 가 1969년 앨범 《Abbey Road》에 담은 노래다.
+            ↓
+        〈Something〉는 [OBJ] 이 쓰고 [SUB] 가 1969년 앨범 《Abbey Road》에 담은 노래다.
+        
+        Arguments:
+        df: add_entity_tokens_base 함수를 적용한 DataFrame
+        
+        Return:
+        df: subject_entity와 object_entity에 마스킹 처리 작업이 완료된 DataFrame
+        """
+        for idx, row in df.iterrows():
+            words=re.findall('\[ENT].+?\[/ENT]',row['sentence'])
+            if row['subject_start_idx']<row['object_start_idx']:
+                df.loc[idx,'sentence']=row['sentence'].replace(words[0],'[SUB]').replace(words[1],'[OBJ]')
+            else:
+                df.loc[idx,'sentence']=row['sentence'].replace(words[0],'[OBJ]').replace(words[1],'[SUB]')
+        
+        df['subject_entity']='[SUB]'
+        df['object_entity']='[OBJ]'
+
+        return df
+
     def entity_mask_detail(self, df):
         """
         sentence, subject_entity, object_entity 컬럼에서 subject_entity와 object_entity에 마스킹 처리
@@ -486,8 +517,8 @@ if __name__ == "__main__":
     test_df = pd.read_csv('./dataset/test/test_data.csv')
 
     # entity_parsing이 적용된 DataFrame 파일 만들기
-    #new_train_df = DataCleaning([]).entity_parsing(train_df.copy(deep=True))
-    #new_test_df = DataCleaning([]).entity_parsing(test_df.copy(deep=True))
+    new_train_df = DataCleaning([]).entity_parsing(train_df.copy(deep=True))
+    new_test_df = DataCleaning([]).entity_parsing(test_df.copy(deep=True))
 
-    #new_train_df.to_csv('./dataset/new_train.csv', index=False)
-    #new_test_df.to_csv('./dataset/new_test.csv', index=False)
+    new_train_df.to_csv('./dataset/new_train.csv', index=False)
+    new_test_df.to_csv('./dataset/new_test.csv', index=False)
