@@ -49,6 +49,8 @@ if __name__ == "__main__":
             tapt_dataloader = data_controller.TAPTDataloader(tokenizer, CFG)  # You'll need to implement this
             tapt_model = TAPTModel(LM, CFG)  # You'll need to implement this
 
+            tapt_logger = WandbLogger(name="TAPT", project="TAPT")
+            
             checkpoint_callback = ModelCheckpoint(
                         monitor='val_loss',
                         dirpath='./tapt_model',
@@ -63,6 +65,7 @@ if __name__ == "__main__":
 
             tapt_trainer = pl.Trainer(accelerator='gpu',
                                       max_epochs=100,
+                                      logger = tapt_logger
                                       callbacks = [early_stopping, checkpoint_callback])
             tapt_trainer.fit(tapt_model, tapt_dataloader)
             # Fine-tune on actual training data
