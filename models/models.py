@@ -139,6 +139,7 @@ class Model(pl.LightningModule):
         ent_indices = []
         for i in range(len(x['input_ids'])):
             ent_indices_batch = torch.where(x['input_ids'][i] == ENT_TOKEN_ID)[0]
+            # 1-1. 입력문장이 길 경우 ENT가 2개 마킹되지 않고 truncated 되는 경우에 대한 예외처리
             if ent_indices_batch.size(-1) == 2:
                 ent_indices.append(ent_indices_batch)
             else:
