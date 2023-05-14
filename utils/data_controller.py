@@ -380,6 +380,45 @@ class DataCleaning():
 
         return df
     
+    def add_only_punct(self, df):
+        """
+        @ : Subject
+        * : Subject_type
+        # : Object
+        ^ : Object_type
+        
+        short_tokenizing과 함께 쓸 것을 권장.        
+                
+        Ex)
+        From ->     〈Something〉는 조지 해리슨이 쓰고 비틀즈가 1969년 앨범 《Abbey Road》에 담은 노래다.
+        To ->       〈Something〉는 # ^ PER ^ 조지 해리슨 # 이 쓰고 @ * ORG * 비틀즈 @ 가 1969년 앨범 《Abbey Road》에 담은 노래다.
+        """
+        
+        new_sentence = []
+        for _, row in df.iterrows():
+            sentence = row["sentence"]
+            sub_type = '* ' + row["sub_type"] + ' * '
+            obj_type = '^ ' + row["obj_type"] + ' ^ '
+            
+            trigger = True if row['object_end_idx'] > row['subject_end_idx'] else False
+
+            for check, idx in enumerate(sorted([row['subject_start_idx'], row['subject_end_idx'], row['object_start_idx'], row['object_end_idx']], reverse=True)):
+                if trigger:
+                    token = " # "
+                else:
+                    token = " @ "
+
+                if check % 2 == 0:
+                    sentence = sentence[:idx+1] + token + sentence[idx+1:]
+                else:
+                    sentence = sentence[:idx] + obj_type if trigger else sub_type + token  + sentence[idx:]
+                    trigger = not trigger
+            
+            new_sentence.append(sentence)
+        df['sentence'] = new_sentence
+
+        return df
+    
     def quering_with_punct(self, df):
         """
         add_only_punct 뒤에 사용할 수 있는 버전의 quering           
