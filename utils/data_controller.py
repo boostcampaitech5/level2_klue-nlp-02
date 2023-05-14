@@ -19,9 +19,10 @@ class Dataset(Dataset):
     Dataloader에서 불러온 데이터를 Dataset으로 만들기
     """
 
-    def __init__(self, inputs, targets=[]):
+    def __init__(self, inputs, targets=[], types=[]):
         self.inputs = inputs
         self.targets = targets
+        self.types = types
 
     def __getitem__(self, idx):
         inputs = {key: val[idx].clone().detach()
@@ -29,8 +30,10 @@ class Dataset(Dataset):
 
         if self.targets:
             targets = torch.tensor(self.targets[idx])
+            s_type = torch.tensor(self.types[0][idx])
+            o_type = torch.tensor(self.types[1][idx])
 
-            return inputs, targets
+            return inputs, targets, (s_type, o_type)
         else:
             return inputs
 
@@ -105,11 +108,20 @@ class Dataloader(pl.LightningDataModule):
             
             train_inputs = self.tokenizing(train_x)
             train_targets = [self.label2num[label] for label in train_y]
-
+            
+            # entity type 분류 모델 학습을 위한 type 데이터 생성
+            type_list = ['PER', 'NOH', 'ORG', 'LOC', 'POH', 'DUR', 'PNT', 'TIM', 'MNY', 'DAT']
+            type_dict = {key:value for value, key in enumerate(type_list)}
+            train_types = (train_x['subject_type'].apply(lambda x:type_dict[x]).tolist(), 
+                           train_x['object_type'].apply(lambda x:type_dict[x]).tolist())    # ([sub_types], [obj_types])
+            
             val_inputs = self.tokenizing(val_x)
             val_targets = [self.label2num[label] for label in val_y]
+            val_types = (val_x['subject_type'].apply(lambda x:type_dict[x]).tolist(), 
+                         val_x['object_type'].apply(lambda x:type_dict[x]).tolist())        # ([sub_types], [obj_types])
 
-            return (train_inputs, train_targets), (val_inputs, val_targets)
+            return (train_inputs, train_targets, train_types), (val_inputs, val_targets, val_types)
+        
         else:
             x = DC.process(x)
 
@@ -123,8 +135,8 @@ class Dataloader(pl.LightningDataModule):
             # 학습 데이터 준비
             train, val = self.preprocessing(self.train_df, train=True)
             
-            self.train_dataset = Dataset(train[0], train[1])
-            self.val_dataset = Dataset(val[0], val[1])
+            self.train_dataset = Dataset(train[0], train[1], train[2])
+            self.val_dataset = Dataset(val[0], val[1], val[2])
         else:
             # 평가 데이터 호출
             predict_inputs = self.preprocessing(self.predict_x)
@@ -450,7 +462,7 @@ class DataAugmentation():
     data augmentation 코드
     """
 
-    def sub_obj_change_augment(df):
+    def sub_obj_change_augment(self, df):
         """
         Note:   (sub, obj) 쌍을 같은 라벨, 같은 sub-type, 같은 obj-type 을 가지고 있는 
                 다른 문장의 (sub, obj) 를 교환하는 형태로 데이터를 증강시킵니다.
