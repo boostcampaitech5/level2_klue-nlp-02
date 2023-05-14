@@ -303,8 +303,9 @@ class TAPTDataloader(pl.LightningDataModule):
         super(TAPTDataloader, self).__init__()
         self.tokenizer = tokenizer
         
-        train_df, _ = load_data()
+        train_df, test_df = load_data()
         self.train_df = train_df
+        self.test_df = test_df
 
         self.train_dataset = None
         self.val_dataset = None
@@ -323,10 +324,10 @@ class TAPTDataloader(pl.LightningDataModule):
 
     def preprocessing(self, x):
         train_x, val_x= train_test_split(x,
-                                        test_size=0.2,
+                                        test_size=0.3,
                                         shuffle=True,
                                         random_state=42)
-
+        train_x = pd.concat([train_x, self.test_df])
         train_inputs = self.tokenizing(train_x)
         val_inputs = self.tokenizing(val_x)
 
@@ -340,11 +341,11 @@ class TAPTDataloader(pl.LightningDataModule):
             self.val_dataset = TAPTDataset(val)
 
     def train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=64, shuffle=True, collate_fn = DataCollatorForLanguageModeling(
+        return DataLoader(self.train_dataset, batch_size=32, shuffle=True, collate_fn = DataCollatorForLanguageModeling(
     tokenizer = self.tokenizer, mlm=True, mlm_probability=0.15))
     
     def val_dataloader(self):
-        return DataLoader(self.val_dataset, batch_size=64, shuffle=True,collate_fn = DataCollatorForLanguageModeling(
+        return DataLoader(self.val_dataset, batch_size=32, shuffle=True,collate_fn = DataCollatorForLanguageModeling(
     tokenizer = self.tokenizer, mlm=True, mlm_probability=0.15))
 
 

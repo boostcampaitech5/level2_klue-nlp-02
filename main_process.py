@@ -45,9 +45,10 @@ if __name__ == "__main__":
     if CFG['train']['TAPT']:
         # Pretrain on combined train and test data (TAPT)
         if not os.path.exists("./tapt_model"):
-            LM = AutoModelForMaskedLM.from_pretrained(CFG['train']['model_name']) 
-            tapt_dataloader = data_controller.TAPTDataloader(tokenizer, CFG)  # You'll need to implement this
-            tapt_model = TAPTModel(LM, CFG)  # You'll need to implement this
+            LM = AutoModelForMaskedLM.from_pretrained(CFG['train']['model_name'])
+            tapt_tokenizer = AutoTokenizer.from_pretrained(CFG['train']['model_name'])
+            tapt_dataloader = data_controller.TAPTDataloader(tapt_tokenizer)  # You'll need to implement this
+            tapt_model = TAPTModel(LM)  # You'll need to implement this
 
             tapt_logger = WandbLogger(name="TAPT", project="TAPT")
             
@@ -65,9 +66,10 @@ if __name__ == "__main__":
 
             tapt_trainer = pl.Trainer(accelerator='gpu',
                                       max_epochs=100,
-                                      logger = tapt_logger
+                                      logger = tapt_logger,
                                       callbacks = [early_stopping, checkpoint_callback])
             tapt_trainer.fit(tapt_model, tapt_dataloader)
+            tapt_model.LM.save_pretrained("./tapt_model")
             # Fine-tune on actual training data
         LM = AutoModelForSequenceClassification.from_pretrained("./tapt_model", num_labels=30)
             
