@@ -397,8 +397,8 @@ class DataCleaning():
         new_sentence = []
         for _, row in df.iterrows():
             sentence = row["sentence"]
-            sub_type = '* [' + row["sub_type"] + '] * '
-            obj_type = '^ [' + row["obj_type"] + '] ^ '
+            sub_type = '* [' + row["subject_type"] + '] * '
+            obj_type = '^ [' + row["object_type"] + '] ^ '
             
             trigger = True if row['object_end_idx'] > row['subject_end_idx'] else False
 
@@ -411,7 +411,7 @@ class DataCleaning():
                 if check % 2 == 0:
                     sentence = sentence[:idx+1] + token + sentence[idx+1:]
                 else:
-                    sentence = sentence[:idx] + token + obj_type if trigger else sub_type + sentence[idx:]
+                    sentence = sentence[:idx] + (token + (obj_type if trigger else sub_type)) + sentence[idx:]
                     trigger = not trigger
             
             new_sentence.append(sentence)
@@ -432,7 +432,7 @@ class DataCleaning():
             object_entity = row["object_entity"]
             object_type = row["object_type"]
             
-            row["sentence"] = f"@ * {subject_type} * {subject_entity} @와 # ^ {object_type} ^ {object_entity}의 관계 [SEP] " + row["sentence"]
+            row["sentence"] = f"@ * {subject_type} * {subject_entity} @와 # ^ {object_type} ^ {object_entity} #의 관계 [SEP] " + row["sentence"]
         
         return df
 
