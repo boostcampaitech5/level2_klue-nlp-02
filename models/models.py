@@ -48,16 +48,26 @@ def focal_loss(logits, y, sub_obj_types, types2labelnum, alpha=1., gamma=2., pen
 
 
 class Model(pl.LightningModule):
-    def __init__(self, LM, CFG):
+    def __init__(self, LM, tokenizer, CFG):
         super().__init__()
         self.save_hyperparameters()
         self.CFG = CFG
 
         # 사용할 모델을 호출
         self.LM = LM  # Language Model
+        self.tokenizer = tokenizer  # Tokenizer
+        self.sep_id = tokenizer.sep_token_id  # Separator token ID
+        
         self.loss_func = eval("torch.nn." + self.CFG['train']['lossF'])()
         self.optim = eval("torch.optim." + self.CFG['train']['optim'])
         self.types2labelnum = load_types2labelnum() if self.CFG['train']['focal_loss'] else None
+        self.lstm = torch.nn.LSTM(input_size = self.LM.model_config.hidden_size,
+                                  hidden_size = self.LM.model_config.hidden_size,
+                                  num_layers = 4,
+                                  dropout = 0.1,
+                                  batch_first = True,
+                                  bidirectional = True) if self.CFG['train']['LSTM']['Do'] else None
+        self.fc = torch.nn.Linear(self.LM.model_config.hidden_size * 2, 30) if self.CFG['train']['LSTM']['Do'] else None
 
     def forward(self, input_ids, attention_mask, token_type_ids):
         outputs = self.LM(
@@ -65,8 +75,37 @@ class Model(pl.LightningModule):
             attention_mask=attention_mask,
             token_type_ids=token_type_ids
         )
+        if not self.CFG['train']['LSTM']['Do']:
+            return outputs['logits']
+        
+        else:
+            """
+            batch 내의 각 sentence에 대해 LSTM을 수행.
+            범위는 가장 앞 [CLS] 부터 처음으로 나오는 [SEP]까지만 수행하는 truncate와 문장 전체에 수행하는 not truncate가 있음
+            """
+            if not self.CFG['train']['LSTM']['truncate']:
+                lstm_outputs, (hidden, cell) = self.lstm(outputs['hidden_states'][-1])
+            else:
+                # Find the position of the [SEP] token
+                sep_positions = (input_ids == self.sep_id).nonzero(as_tuple=True)[1]
 
-        return outputs['logits']
+                # Prepare the sequences for LSTM
+                lstm_input = []
+                for i, pos in enumerate(sep_positions):
+                    lstm_input.append(outputs["hidden_states"][-1][i, :pos])
+                lstm_input = torch.nn.utils.rnn.pad_sequence(lstm_input, batch_first=True)
+
+                # Pass the sequences through LSTM
+                lstm_outputs, (hidden, cell) = self.lstm(lstm_input)
+
+            # Concatenate the forward and backward hidden states
+            output = torch.cat((hidden[0], hidden[1]), dim=1)
+
+            # Pass the output through a fully connected layer
+            logits = self.fc(output)
+
+            return logits
+            
 
     def training_step(self, batch, batch_idx):
         x, y, sub_obj_types = batch

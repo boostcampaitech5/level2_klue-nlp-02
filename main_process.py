@@ -79,7 +79,7 @@ if __name__ == "__main__":
             pretrained_model_name_or_path=CFG['train']['model_name'], num_labels=30)
     
     LM.resize_token_embeddings(len(tokenizer))
-    model = Model(LM, CFG)
+    model = Model(LM, tokenizer, CFG)
     # check point
     checkpoint = ModelCheckpoint(monitor='val_micro_f1_Score',
                                  save_top_k=CFG['train']['save_top_k'],
