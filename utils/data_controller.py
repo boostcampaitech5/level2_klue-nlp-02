@@ -1,3 +1,4 @@
+import re
 import pickle
 import torch
 import pandas as pd
@@ -6,14 +7,13 @@ import pytorch_lightning as pl
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset, DataLoader
 from transformers import DataCollatorForLanguageModeling
+from tqdm import tqdm
 # from konlpy.tag import Okt
 # from pykospacing import Spacing
 # from hanspell import spell_checker
 # from pororo import Pororo
-
-
 # from hangulize import hangulize
-import re
+
 
 class Dataset(Dataset):
     """
@@ -211,7 +211,7 @@ class Dataloader(pl.LightningDataModule):
             train_targets = [self.label2num[label] for label in train_y]
 
             val_inputs = tokenizing_method(val_x)
-            val_targets = [self.label2num[label] for label in val_y]
+            val_targets = [self.label2num[label] for label in val_y]      # ([sub_types], [obj_types])
 
             return (train_inputs, train_targets, train_x[['subject_type', 'object_type']]), (val_inputs, val_targets, val_x[['subject_type', 'object_type']])
         else:
@@ -505,30 +505,6 @@ class DataCleaning():
             if pattern.search(df.loc[i,'object_entity']):
                 df.loc[i, 'object_entity'] = hangulize(df.loc[i, 'object_entity'], language)
         return df
-
-    def entity_mask(self, df):
-        """ sentence 컬럼에서 subject_entity와 object_entity에 마스킹 처리(index 기준으로)
-        subject_entity → [SUB] 마스킹
-        object_entity → [OBJ] 마스킹
-        
-        Note: <데이터 예시>
-        〈Something〉는 조지 해리슨이 쓰고 비틀즈가 1969년 앨범 《Abbey Road》에 담은 노래다.
-            ↓
-        〈Something〉는 [OBJ]이 쓰고 [SUB]가 1969년 앨범 《Abbey Road》에 담은 노래다.
-        
-        Arguments:
-        df: entity_mask를 수행하고자 하는 DataFrame
-        
-        Return:
-        df: entity_mask 작업이 완료된 DataFrame
-        """
-        for idx, row in df.iterrows():
-            if row['subject_start_idx']<row['object_start_idx']:
-                df.loc[idx,'sentence']=row['sentence'][:row['subject_start_idx']]+'[SUB]'+row['sentence'][row['subject_end_idx']+1:row['object_start_idx']]+'[OBJ]'+row['sentence'][row['object_end_idx']+1:]
-            else:
-                df.loc[idx,'sentence']=row['sentence'][:row['object_start_idx']]+'[OBJ]'+row['sentence'][row['object_end_idx']+1:row['subject_start_idx']]+'[SUB]'+row['sentence'][row['subject_end_idx']+1:]
-        
-        return df
     
     def remove_duplicated(self, df):
         """
@@ -711,12 +687,68 @@ class DataCleaning():
 
         df['sentence'] = df['sentence'].apply(lambda x: lib(x.replace(" ", "")))
 
-    """
-    Spell check 코드
-    """
+    def entity_mask_base(self, df):
+        """
+        sentence, subject_entity, object_entity 컬럼에서 subject_entity와 object_entity에 마스킹 처리
+        [ENT] subject_entity [/ENT] → [SUB] 마스킹
+        [ENT] object_entity [/ENT]→ [OBJ] 마스킹
+        
+        *** add_entity_tokens_base 함수를 먼저 적용해줘야 함! ***
+
+        Note: <데이터 예시>
+        〈Something〉는 [ENT] 조지 해리슨 [/ENT] 이 쓰고 [ENT] 비틀즈 [/ENT] 가 1969년 앨범 《Abbey Road》에 담은 노래다.
+            ↓
+        〈Something〉는 [OBJ] 이 쓰고 [SUB] 가 1969년 앨범 《Abbey Road》에 담은 노래다.
+        
+        Arguments:
+        df: add_entity_tokens_base 함수를 적용한 DataFrame
+        
+        Return:
+        df: subject_entity와 object_entity에 마스킹 처리 작업이 완료된 DataFrame
+        """
+        for idx, row in df.iterrows():
+            words=re.findall('\[ENT].+?\[/ENT]',row['sentence'])
+            if row['subject_start_idx']<row['object_start_idx']:
+                df.loc[idx,'sentence']=row['sentence'].replace(words[0],'[SUB]').replace(words[1],'[OBJ]')
+            else:
+                df.loc[idx,'sentence']=row['sentence'].replace(words[0],'[OBJ]').replace(words[1],'[SUB]')
+        
+        df['subject_entity']='[SUB]'
+        df['object_entity']='[OBJ]'
+
+        return df
+
+    def entity_mask_detail(self, df):
+        """
+        sentence, subject_entity, object_entity 컬럼에서 subject_entity와 object_entity에 마스킹 처리
+        [S:{type}] subject_entity [/S:{type}] → [S:{type}] 마스킹
+        [O:{type}] object_entity [/O:{type}] → [O:{type}] 마스킹
+        
+        *** add_entity_tokens_detail 함수를 먼저 적용해줘야 함! ***
+
+        Note: <데이터 예시>
+        〈Something〉는 [O:PER] 조지 해리슨 [/O:PER] 이 쓰고 [S:ORG] 비틀즈 [/S:ORG] 가 1969년 앨범 《Abbey Road》에 담은 노래다.
+            ↓
+        〈Something〉는 [O:PER] 이 쓰고 [S:ORG] 가 1969년 앨범 《Abbey Road》에 담은 노래다.
+        
+        Arguments:
+        df: add_entity_tokens_detail 함수를 적용한 DataFrame
+        
+        Return:
+        df: subject_entity와 object_entity에 마스킹 처리 작업이 완료된 DataFrame
+        """
+        df['sentence']=df['sentence'].apply(lambda x: re.sub(r'\[S:.+?].+?\[/S:.+?]',re.findall(r'\[S:.+?]',x)[0],x))
+        df['sentence']=df['sentence'].apply(lambda x: re.sub(r'\[O:.+?].+?\[/O:.+?]',re.findall(r'\[O:.+?]',x)[0],x))
+        df['subject_entity']=df['sentence'].apply(lambda x: re.findall(r'\[S:.+?]',x)[0])
+        df['object_entity']=df['sentence'].apply(lambda x: re.findall(r'\[O:.+?]',x)[0])
+
+        return df
+
     def dc_hanspell(self, df):
-        """ sentence, subject_entity, object_entity spell check (띄어쓰기도 해 줌)
-            hanspell 라이브러리 사용 : https://github.com/ssut/py-hanspell
+        """ 
+        Spell check 코드
+        sentence, subject_entity, object_entity spell check (띄어쓰기도 해 줌)
+        hanspell 라이브러리 사용 : https://github.com/ssut/py-hanspell
         
         Note: <데이터 예시>
         진도군은 진도개를 보기 위해 찾아온 관람객들에게 더욱 흥미롭고 즐거움을 선사하기 위해 ▲팔백리길을 돌아온 백구 생가 토피어리 조형물 ▲어로(犬수영장)수렵장 ▲진도개 애견 캠핑장 등도 운영하고 있다.	
@@ -736,12 +768,10 @@ class DataCleaning():
         
         return df
     
-    """
-    문장에서 entity를 제외한 사람 이름을 [PER]로 바꿔주는 코드 (윤리적 이슈)
-    """
-
     def dc_change_per_others(self,df):
-        """ sentence를 변환
+        """ 
+        문장에서 entity를 제외한 사람 이름을 [PER]로 바꿔주는 코드 (윤리적 이슈)
+         sentence를 변환
             Pororo 라이브러리 사용 : https://github.com/kakaobrain/pororo
             issue: torch v 1.6
         
@@ -769,31 +799,22 @@ class DataCleaning():
                     w = '[PER]'     # 김동연 -> [PER]
                 else:
                     pass
-                # print(w)
                 final_sen+=w
-            # print(sen)
             return final_sen  # 문장 반환: '특히 [PER] 전 경제부총리를 비롯한 [PER] 국회의원, '
         
         def per_change_sent(x):
             sen_ori = x[0]
-            idx = sorted([0,x[3],x[4]+1,x[5],x[6]+1,len(x[0])])   # index 준비 : subject_start_idx, subject_end_idx,  ,,,
-            # print(idx,len(x[0]))
-            sentences=[]
-
-            for i in range(len(idx)-1):
-                # print(idx[i] , idx[i+1])
-                if idx[i]==x[3]:            # subject_start_idx: 사람 이름인데 sub_ent라면 [PER]로 변환하면 안돼서 따로 빼줌
-                    sentences.append(x[1])        
-                elif idx[i]==x[5]:          # object_start_idx: 마찬가지
-                    sentences.append(x[2])        
+            sen_new = []
+            sentences = re.split(' ?\[ENT\] ?| ?\[\/ENT\] ?',sen_ori)
+            for s in sentences:
+                if s != x[1] and s!=x[2]: # 사람 이름인데 sub_ent, obj_ent라면 [PER]로 변환하면 안됨
+                    sen_new.append(per_change(s)) # 나머지 사람 이름은 [PER]로 변환
                 else:
-                    sentences.append(per_change(sen_ori[ idx[i] : idx[i+1] ]))   # 나머지 사람 이름은 [PER]로 변환
-                    # print(sen_ori[ idx[i] : idx[i+1] ])
-            # print(sentences)
-            return ' '.join(sentences)
+                    sen_new.append(s)
+            return ' '.join(sen_new)
         
 
-        df['sentence']=df[['sentence', 'subject_entity','object_entity','subject_start_idx','subject_end_idx','object_start_idx','object_end_idx']].apply(per_change_sent, axis=1)
+        df['sentence']=df[['sentence', 'subject_entity','object_entity']].apply(per_change_sent, axis=1)
         # apply로 데이터 프레임을 직접적으로 처리
         return df
 
@@ -858,8 +879,8 @@ class DataAugmentation():
                             'org:member_of' : 'org:members',
                             'org:top_members/employees' : 'per:employee_of',
                             'per:employee_of' : 'org:top_members/employees'}
-        auto_df = df[df['label'].isin(auto_augmentation)]
-        cross_df = df[df['label'].isin(cross_augmentation.keys())]
+        auto_df = df[df['label'].isin(auto_augmentation)].copy()
+        cross_df = df[df['label'].isin(cross_augmentation.keys())].copy()
 
         auto_df['subject_entity'], auto_df['object_entity'] = auto_df['object_entity'].copy(), auto_df['subject_entity'].copy()
 
@@ -867,6 +888,64 @@ class DataAugmentation():
         cross_df['label'] = cross_df['label'].map(cross_augmentation)
 
         return pd.concat([auto_df, cross_df], ignore_index=True)
+
+    def sub_obj_change_augment(self, df):
+        """
+        Note:   (sub, obj) 쌍을 같은 라벨, 같은 sub-type, 같은 obj-type 을 가지고 있는 
+                다른 문장의 (sub, obj) 를 교환하는 형태로 데이터를 증강시킵니다.
+                train.csv에서 상대적으로 적은 obj-type을 가지는 POH, DAT, LOC 만을 증강시킵니다.
+                no_relation인 라벨은 증강시키지 않습니다.
+        
+        Arugments:
+        증강하고자 하는 dataframe
+                
+        Return:
+        Note 규칙 기반으로 새롭게 생성된 문장 dataframe
+        """
+        
+        label_list = sorted(list(df['label'].unique()))[1:]         # no_relation 제외
+        aug_obj_type = ['POH', 'DAT', 'LOC']
+        
+        df_copied = df.copy(deep=True)
+        copy_element = ['label', 'source', 'subject_start_idx', 
+                        'subject_end_idx', 'subject_type', 'object_start_idx', 'object_end_idx', 'object_type']
+        aug_dict = {key:[] for idx, key in enumerate(df.columns.tolist())}
+        
+        # 1. 특정 라벨 선택
+        for label in tqdm(label_list, desc="Augmentation by (sub, obj) change"):
+            # 2. Object type에서 POH, DAT, LOC 확인
+            for obj_type in aug_obj_type:
+                temp_df = df_copied[(df_copied['label'] == label) & (df_copied['object_type'] == obj_type)]
+                if len(temp_df) == 0:
+                    continue
+                
+                # 3. sub type - obj type 같을 때만 교체해서 증강
+                sub_type_list = sorted(list(temp_df['subject_type'].unique()))  # ['PER', 'ORG']
+                for sub_type in sub_type_list:
+                    # 4. (sub, obj) 쌍을 구하고
+                    tuple_list = temp_df[temp_df['subject_type'] == sub_type].apply(lambda x:(x['id'], x['subject_entity'], x['object_entity']), axis=1).tolist()
+                    
+                    # 5. 거꾸로 서로 교체. -> 데이터 2배 증가
+                    for idx, (id, sub_en_target, obj_en_target) in enumerate(tuple_list):
+                        sent_target = df_copied.loc[id]['sentence']
+                        
+                        sub_en_change = tuple_list[len(tuple_list)-idx-1][1]
+                        obj_en_chage = tuple_list[len(tuple_list)-idx-1][2]
+                        
+                        sent_change = sent_target.replace(sub_en_target, sub_en_change).replace(obj_en_target, obj_en_chage)
+                        
+                        aug_dict['id'].append(id)
+                        aug_dict['sentence'].append(sent_change)
+                        aug_dict['subject_entity'].append(sub_en_change)
+                        aug_dict['object_entity'].append(obj_en_chage)
+
+                        # 5-1. 변경하지 않는 컬럼 성분은 그냥 복붙.
+                        for c in copy_element:
+                            aug_dict[c].append(df.loc[id][c])
+                            
+        aug_df = pd.DataFrame(aug_dict)
+        
+        return aug_df
 
 
 def load_data():
@@ -895,6 +974,13 @@ def load_num2label():
     return num2label
 
 
+def load_types2labelnum():
+    with open('./code/dict_types_to_labelnum.pkl', 'rb') as f:
+        types2labelnum = pickle.load(f)
+    
+    return types2labelnum
+
+
 if __name__ == "__main__":
     train_df = pd.read_csv('./dataset/train/train.csv')
     test_df = pd.read_csv('./dataset/test/test_data.csv')
@@ -905,3 +991,19 @@ if __name__ == "__main__":
 
     new_train_df.to_csv('./dataset/new_train.csv', index=False)
     new_test_df.to_csv('./dataset/new_test.csv', index=False)
+    
+    types2labelnum = {('PER', 'PER'): {0, 6, 10, 12, 13, 14, 15, 16, 17, 21},
+                      ('PER', 'POH'): {0, 4, 6, 8, 11, 12, 14, 15, 17, 21, 23, 29},
+                      ('PER', 'ORG'): {0, 4, 6, 11, 12, 14, 15, 23, 29},
+                      ('PER', 'LOC'): {0, 6, 11, 15, 23, 26, 27},
+                      ('PER', 'DAT'): {0, 11, 15, 24, 25},
+                      ('PER', 'NOH'): {0},
+                      ('ORG', 'PER'): {0, 1, 3, 5, 28},
+                      ('ORG', 'POH'): {0, 1, 2, 3, 5, 7, 19, 20},
+                      ('ORG', 'ORG'): {0, 1, 2, 3, 5, 7, 19, 20, 28},
+                      ('ORG', 'LOC'): {0, 1, 2, 3, 5, 7, 19, 20},
+                      ('ORG', 'DAT'): {0, 3, 5, 18, 22},
+                      ('ORG', 'NOH'): {0, 3, 5, 9}}
+    
+    with open('./code/dict_types_to_labelnum.pkl', 'wb') as f:
+        pickle.dump(types2labelnum, f)
