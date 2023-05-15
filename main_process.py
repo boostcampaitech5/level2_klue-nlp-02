@@ -14,6 +14,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import LearningRateMonitor
+from shutil import copyfile
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -101,6 +102,7 @@ if __name__ == "__main__":
         callbacks.append(early_stopping)
     # fit
     trainer = pl.Trainer(accelerator='gpu',
+                         precision="16-mixed",
                          max_epochs=CFG['train']['epoch'],
                          default_root_dir=save_path,
                          log_every_n_steps=1,
@@ -139,3 +141,4 @@ if __name__ == "__main__":
 
         pred_label, probs = inference_model(model, dataloader)
         utils.save_csv(submit, pred_label, probs, save_path, folder_name, ckpt_name.split('=')[-1][:7])
+    copyfile('use_config.yaml','f"{save_path}/config.yaml"')

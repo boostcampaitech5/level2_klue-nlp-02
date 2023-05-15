@@ -5,8 +5,8 @@ train:
   model_name: 허깅페이스 모델명
   epoch: 100
   batch_size: 32
-  LR: #LambdaLR, StepLR, CyclicLR, ExponentialLR, WarmupConstantLR
-    name: 스케줄러명
+  LR: 
+    name: 스케줄러명 # LambdaLR, StepLR, CyclicLR, ExponentialLR, WarmupConstantLR 
     lr: 0.000001
     base: 20 # CyclicLR를 쓴다면, LR에 대한 min_lr을 적어주세요(20 == LR/20)
     max: 5 # CyclicLR를 쓴다면, LR에 대한 max_lr을 적어주세요(5 == LR/5)
@@ -40,6 +40,8 @@ select_DC:
   - add_others_tokens
   - quering_with_punct
 select_DA:
+  # - swap_sentence
+  # - sub_obj_change_augment
 wandb:
   id: 아이디
 option:

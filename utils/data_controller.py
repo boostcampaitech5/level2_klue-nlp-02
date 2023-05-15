@@ -248,7 +248,7 @@ class Dataloader(pl.LightningDataModule):
             self.val_dataset = Dataset(val[0], val[1], val[2], no_valid = self.CFG['train']['no_valid'])
         else:
             # 평가 데이터 호출
-            predict_inputs = self.preprocessing(self.predict_x)
+            predict_inputs = self.preprocessing(self.predict_x.copy())
             self.predict_dataset = Dataset(predict_inputs)
 
     def train_dataloader(self):
@@ -530,7 +530,7 @@ class DataCleaning():
 
         *train dataset에 대해서만 적용
         """
-        del_idx = [6749, 8364, 22258, 277, 10202, 4212]
+        del_idx = [6749, 8364, 22258, 277, 4212]
         df.drop(del_idx, axis=0, inplace=True)
         df.reset_index(drop=True, inplace=True)
 
@@ -1001,6 +1001,9 @@ def load_types2labelnum():
 if __name__ == "__main__":
     train_df = pd.read_csv('./dataset/train/train.csv')
     test_df = pd.read_csv('./dataset/test/test_data.csv')
+    
+    # 중복 제거
+    train_df = train_df[['sentence','subject_entity','object_entity','source','label']].drop_duplicates()
 
     # entity_parsing이 적용된 DataFrame 파일 만들기
     new_train_df = DataCleaning([]).entity_parsing(train_df.copy(deep=True))

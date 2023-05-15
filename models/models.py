@@ -72,7 +72,7 @@ class Model(pl.LightningModule):
         self.fc = torch.nn.Linear(self.LM.config.hidden_size * 2, 30) if self.CFG['train']['LSTM']['Do'] else None
         
         # entity type 분류 레이어 추가 - multi task 를 위한 세팅
-        if "add_entity_tokens_base" in self.CFG['select_DC'] and self.CFG['train']['type_classify']:
+        if self.CFG['select_DC'] is not None and "add_entity_tokens_base" in self.CFG['select_DC'] and self.CFG['train']['type_classify']:
             self.type_classify_init()
 
     def forward(self, input_ids, attention_mask, token_type_ids):
@@ -126,7 +126,7 @@ class Model(pl.LightningModule):
         else focal_loss(outputs['logits'], y, sub_obj_types, self.types2labelnum, self.CFG['train']['lossF']['focal_loss_scale'])
 
         # multi-task learning: type classify 학습
-        if "add_entity_tokens_base" in self.CFG['select_DC'] and self.CFG['train']['type_classify']:
+        if self.CFG['select_DC'] is not None and "add_entity_tokens_base" in self.CFG['select_DC'] and self.CFG['train']['type_classify']:
             preds = self.type_classify_forward(x, outputs['hidden_states'])
             loss += self.type_classify_cal_loss(preds, sub_obj_types, alpha=0.5)
         self.log("train_loss", loss)
@@ -212,7 +212,7 @@ class Model(pl.LightningModule):
         self.dropout = torch.nn.Dropout(0.1)
         self.pooler_layer = torch.nn.Linear(768, len(self.type_list))
         
-        self.type_classify_loss = eval("torch.nn." + self.CFG['train']['lossF'])()
+        self.type_classify_loss = torch.nn.CrossEntropyLoss()
         # self.type_classify_optim = eval("torch.optim." + self.CFG['train']['optim']) 
         
     def type_classify_forward(self, x, hidden_state):
