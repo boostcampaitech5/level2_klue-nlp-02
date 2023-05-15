@@ -102,6 +102,7 @@ if __name__ == "__main__":
         callbacks.append(early_stopping)
     # fit
     trainer = pl.Trainer(accelerator='gpu',
+                         precision="16-mixed",
                          max_epochs=CFG['train']['epoch'],
                          default_root_dir=save_path,
                          log_every_n_steps=1,
