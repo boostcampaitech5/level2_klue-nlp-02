@@ -5,6 +5,7 @@ import pytorch_lightning as pl
 import pickle
 
 from utils import metrics
+from utils.utils import load_types2labelnum
 from . import train
 
 def focal_loss(logits, y, sub_obj_types, types2labelnum, alpha=0.5, gamma=2., penalty_scale=1):
@@ -79,7 +80,7 @@ class Model(pl.LightningModule):
             input_ids=input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
-            output_hidden_states = True
+            output_hidden_states=True
         )
         
         if self.CFG['train']['LSTM']['Do']:
@@ -276,3 +277,100 @@ class Model(pl.LightningModule):
         self.log('type_class_loss', type_loss)
         
         return type_loss
+
+class ADVSModel(pl.LightningModule):
+    def __init__(self, LM):
+        super().__init__()
+        self.save_hyperparameters()
+        # 사용할 모델을 호출
+        self.LM = LM  # Language Model
+        self.loss_func = torch.nn.CrossEntropyLoss()
+        self.optim = torch.optim.AdamW
+
+    def forward(self, input_ids, attention_mask, token_type_ids):
+        outputs = self.LM(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids
+        )
+
+        return outputs['logits']
+
+    def training_step(self, batch, batch_idx):
+        x, y = batch
+        logits = self(
+            input_ids=x['input_ids'],
+            attention_mask=x['attention_mask'],
+            token_type_ids=x['token_type_ids']
+        )
+        loss = self.loss_func(logits, y)
+
+        self.log("train_loss", loss)
+
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        x, y = batch
+        logits = self(
+            input_ids=x['input_ids'],
+            attention_mask=x['attention_mask'],
+            token_type_ids=x['token_type_ids']
+        )
+        loss = self.loss_func(logits, y)
+        self.log("val_loss", loss)
+
+        return loss
+
+    def predict_step(self, batch, batch_idx):
+        x = batch
+        logits = self(
+            input_ids=x['input_ids'],
+            attention_mask=x['attention_mask'],
+            token_type_ids=x['token_type_ids']
+        )
+        probs = F.softmax(logits, dim=-1)
+
+        return probs.tolist()
+
+    def configure_optimizers(self):
+        optimizer = self.optim(self.parameters(), lr=0.00001)
+
+        return [optimizer]
+    
+    
+class TAPTModel(pl.LightningModule):
+    def __init__(self, LM):
+        super().__init__()
+        self.LM = LM
+
+    def forward(self, input_ids, attention_mask=None, labels=None):
+        outputs = self.LM(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            labels=labels
+        )
+        return outputs
+
+    def training_step(self, batch, batch_idx):
+        outputs = self(
+            input_ids=batch['input_ids'],
+            attention_mask=batch['attention_mask'],
+            labels=batch['input_ids']  # Labels for MLM are the same as input_ids
+        )
+        loss = outputs['loss']  # Loss is calculated by the model
+        self.log("train_loss", loss)
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        outputs = self(
+            input_ids=batch['input_ids'],
+            attention_mask=batch['attention_mask'],
+            labels=batch['input_ids']
+        )
+        loss = outputs['loss']
+        self.log("val_loss", loss)
+        return loss
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.AdamW(self.parameters(), lr=0.000001)
+        return [optimizer]

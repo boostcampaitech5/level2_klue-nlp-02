@@ -6,6 +6,7 @@ import pytorch_lightning as pl
 
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset, DataLoader
+from transformers import DataCollatorForLanguageModeling
 from tqdm import tqdm
 # from konlpy.tag import Okt
 # from pykospacing import Spacing
@@ -35,10 +36,48 @@ class Dataset(Dataset):
             return inputs, targets, sub_obj_types
         else:
             return inputs
+        
+    def __len__(self):
+        return len(self.inputs['input_ids'])
+        
+class ADVSDataset(Dataset):
+    """
+    Dataloader에서 불러온 데이터를 Dataset으로 만들기
+    """
+
+    def __init__(self, inputs, targets=[]):
+        self.inputs = inputs
+        self.targets = targets
+
+    def __getitem__(self, idx):
+        inputs = {key: val[idx].clone().detach()
+                  for key, val in self.inputs.items()}
+
+        if self.targets:
+            targets = torch.tensor(self.targets[idx])
+            
+            return inputs, targets
+        else:
+            return inputs
 
     def __len__(self):
         return len(self.inputs['input_ids'])
+    
+class TAPTDataset(Dataset):
+    """
+    Dataloader에서 불러온 데이터를 Dataset으로 만들기
+    """
 
+    def __init__(self, inputs):
+        self.inputs = inputs
+
+    def __getitem__(self, idx):
+        inputs = {key: val[idx].clone().detach()
+                  for key, val in self.inputs.items()}
+        return inputs
+
+    def __len__(self):
+        return len(self.inputs['input_ids'])
 
 class Dataloader(pl.LightningDataModule):
     """
@@ -122,22 +161,57 @@ class Dataloader(pl.LightningDataModule):
             x = DC.process(x, train=True)
             x = DA.process(x)
 
-            train_x = x.drop(['label'], axis=1)
-            train_y = x['label']
+            if not self.CFG['train']['adverse_valid']:
+                train_x = x.drop(['label'], axis=1)
+                train_y = x['label']
+            
+                train_x, val_x, train_y, val_y = train_test_split(train_x, train_y,
+                                                                stratify=train_y,
+                                                                test_size=self.CFG['train']['test_size'],
+                                                                shuffle=self.CFG['train']['shuffle'],
+                                                                random_state=self.CFG['seed'])
+            else:
+                # Sort the dataframe by similarity score in descending order
+                df = x.sort_values(by='prob_1', ascending=False)
 
-            train_x, val_x, train_y, val_y = train_test_split(train_x, train_y,
-                                                              stratify=train_y,
-                                                              test_size=self.CFG['train']['test_size'],
-                                                              shuffle=self.CFG['train']['shuffle'],
-                                                              random_state=self.CFG['seed'])
+                # Define the validation size
+                valid_size = 0.2
+
+                # Initialize an empty dataframe for the validation set
+                valid_df = pd.DataFrame()
+
+                # For each unique label...
+                for label in df['label'].unique():
+                    # Filter the dataframe for the current label
+                    df_label = df[df['label'] == label]
+                    
+                    # Calculate the number of validation instances for the current label
+                    num_valid = int(len(df_label) * valid_size)
+                    
+                    # Add the instances with the highest similarity scores to the validation set
+                    valid_df = valid_df.append(df_label.iloc[:num_valid])
+                    
+                    # Remove these instances from the original dataframe
+                    df = df.drop(df_label.iloc[:num_valid].index)
+
+                # What remains in df is the training set
+                train_df = df
+
+                # Optionally, reset the indices of the train and validation dataframes
+                train_df = train_df.reset_index(drop=True)
+                valid_df = valid_df.reset_index(drop=True)
+                
+                train_x = train_df.drop(['label'], axis=1)
+                train_y = train_df['label']
+                
+                val_x = valid_df.drop(['label'], axis=1)
+                val_y = valid_df['label']
             
             train_inputs = tokenizing_method(train_x)
             train_targets = [self.label2num[label] for label in train_y]
 
             val_inputs = tokenizing_method(val_x)
-            val_targets = [self.label2num[label] for label in val_y]
-            val_types = (val_x['subject_type'].apply(lambda x:type_dict[x]).tolist(), 
-                         val_x['object_type'].apply(lambda x:type_dict[x]).tolist())        # ([sub_types], [obj_types])
+            val_targets = [self.label2num[label] for label in val_y]      # ([sub_types], [obj_types])
 
             return (train_inputs, train_targets, train_x[['subject_type', 'object_type']]), (val_inputs, val_targets, val_x[['subject_type', 'object_type']])
         else:
@@ -164,10 +238,144 @@ class Dataloader(pl.LightningDataModule):
         return DataLoader(self.train_dataset, batch_size=self.CFG['train']['batch_size'], shuffle=self.CFG['train']['shuffle'])
     
     def val_dataloader(self):
-        return DataLoader(self.val_dataset, batch_size=self.CFG['train']['batch_size'])
+        return DataLoader(self.val_dataset, batch_size=self.CFG['train']['batch_size'], shuffle=self.CFG['train']['shuffle'])
 
     def predict_dataloader(self):
         return DataLoader(self.predict_dataset, batch_size=self.CFG['train']['batch_size'])
+    
+class ADVSDataloader(pl.LightningDataModule):
+    """
+    Adversarial Validation Set을 위한 데이터 로더
+    """
+
+    def __init__(self, tokenizer):
+        super(ADVSDataloader, self).__init__()
+        self.tokenizer = tokenizer
+        
+        train_df, test_df = load_data()
+        train_df['comes_from'] = 0
+        test_df['comes_from'] = 1
+        self.train_df = pd.concat([train_df, test_df])
+        
+        train_only_df, _ = load_data()
+        self.predict_df = train_only_df
+
+        self.train_dataset = None
+        self.val_dataset = None
+        self.predict_dataset = None
+
+    def tokenizing(self, x):
+        concat_entity = []
+        for sub_ent, obj_ent in zip(x['subject_entity'], x['object_entity']):
+            concat_entity.append(obj_ent + " [SEP] " + sub_ent)
+
+        inputs = self.tokenizer(
+            concat_entity,
+            list(x['sentence']),
+            return_tensors='pt',
+            padding=True,
+            truncation=True,
+            max_length=170,
+            add_special_tokens=True,
+        )
+
+        return inputs
+
+    def preprocessing(self, x, train=False):
+        if train:
+            train_x = x.drop(['comes_from'], axis=1)
+            train_y = x['comes_from']
+
+            train_x, val_x, train_y, val_y = train_test_split(train_x, train_y,
+                                                                stratify=train_y,
+                                                                test_size=0.2,
+                                                                shuffle=True,
+                                                                random_state=42)
+            
+            train_inputs = self.tokenizing(train_x)
+            train_targets = [i for i in train_y]
+
+            val_inputs = self.tokenizing(val_x)
+            val_targets = [i for i in val_y]
+
+            return (train_inputs, train_targets), (val_inputs, val_targets)
+        else:
+            predict_x =  self.tokenizing(x)
+            return predict_x
+
+    def setup(self, stage='fit'):
+        if stage == 'fit':
+            # 학습 데이터 준비
+            train, val = self.preprocessing(self.train_df, train=True)
+            self.train_dataset = ADVSDataset(train[0], train[1])
+            self.val_dataset = ADVSDataset(val[0], val[1])
+        else:
+            # 평가 데이터 호출
+            predict_inputs = self.preprocessing(self.predict_df)
+            self.predict_dataset = ADVSDataset(predict_inputs)
+
+    def train_dataloader(self):
+        return DataLoader(self.train_dataset, batch_size=64, shuffle=True)
+    
+    def val_dataloader(self):
+        return DataLoader(self.val_dataset, batch_size=64, shuffle=True)
+
+    def predict_dataloader(self):
+        return DataLoader(self.predict_dataset, batch_size=64, shuffle=False)
+    
+class TAPTDataloader(pl.LightningDataModule):
+    """
+    Adversarial Validation Set을 위한 데이터 로더
+    """
+
+    def __init__(self, tokenizer):
+        super(TAPTDataloader, self).__init__()
+        self.tokenizer = tokenizer
+        
+        train_df, test_df = load_data()
+        self.train_df = train_df
+        self.test_df = test_df
+
+        self.train_dataset = None
+        self.val_dataset = None
+
+    def tokenizing(self, x):
+        inputs = self.tokenizer(
+            list(x['sentence']),
+            return_tensors='pt',
+            padding=True,
+            truncation=True,
+            max_length=170,
+            add_special_tokens=True,
+        )
+
+        return inputs
+
+    def preprocessing(self, x):
+        train_x, val_x= train_test_split(x,
+                                        test_size=0.3,
+                                        shuffle=True,
+                                        random_state=42)
+        train_x = pd.concat([train_x, self.test_df])
+        train_inputs = self.tokenizing(train_x)
+        val_inputs = self.tokenizing(val_x)
+
+        return train_inputs, val_inputs
+
+    def setup(self, stage='fit'):
+        if stage == 'fit':
+            # 학습 데이터 준비
+            train, val = self.preprocessing(self.train_df)
+            self.train_dataset = TAPTDataset(train)
+            self.val_dataset = TAPTDataset(val)
+
+    def train_dataloader(self):
+        return DataLoader(self.train_dataset, batch_size=32, shuffle=True, collate_fn = DataCollatorForLanguageModeling(
+    tokenizer = self.tokenizer, mlm=True, mlm_probability=0.15))
+    
+    def val_dataloader(self):
+        return DataLoader(self.val_dataset, batch_size=32, shuffle=True,collate_fn = DataCollatorForLanguageModeling(
+    tokenizer = self.tokenizer, mlm=True, mlm_probability=0.15))
 
 
 class DataCleaning():
@@ -369,14 +577,21 @@ class DataCleaning():
                 
         Ex)
         From ->     〈Something〉는 조지 해리슨이 쓰고 비틀즈가 1969년 앨범 《Abbey Road》에 담은 노래다.
-        To ->       〈Something〉는 # ^ [PER] ^ 조지 해리슨 # 이 쓰고 @ * [ORG] * 비틀즈 @ 가 1969년 앨범 《Abbey Road》에 담은 노래다.
+        To ->       〈Something〉는 # ^ 사람 ^ 조지 해리슨 # 이 쓰고 @ * 모임 * 비틀즈 @ 가 1969년 앨범 《Abbey Road》에 담은 노래다.
         """
+        
+        type2korean = {'PER' : '사람',
+                       'ORG' : '모임',
+                       'DAT' : '날짜',
+                       'NOH' : '숫자',
+                       'POH' : '명사',
+                       'LOC' : '장소'}
         
         new_sentence = []
         for _, row in df.iterrows():
             sentence = row["sentence"]
-            sub_type = '* [' + row["sub_type"] + '] * '
-            obj_type = '^ [' + row["obj_type"] + '] ^ '
+            sub_type = '* ' + type2korean[row["subject_type"]] + ' * '
+            obj_type = '^ ' + type2korean[row["object_type"]] + ' ^ '
             
             trigger = True if row['object_end_idx'] > row['subject_end_idx'] else False
 
@@ -389,12 +604,47 @@ class DataCleaning():
                 if check % 2 == 0:
                     sentence = sentence[:idx+1] + token + sentence[idx+1:]
                 else:
-                    sentence = sentence[:idx] + token + obj_type if trigger else sub_type + sentence[idx:]
+                    sentence = sentence[:idx] + (token + (obj_type if trigger else sub_type)) + sentence[idx:]
                     trigger = not trigger
             
             new_sentence.append(sentence)
         df['sentence'] = new_sentence
 
+        return df
+    
+    def quering_with_punct(self, df):
+        """
+        add_only_punct 뒤에 사용할 수 있는 버전의 quering           
+        From ->       〈Something〉는 # ^ 사람 ^ 조지 해리슨 # 이 쓰고 @ * 모임 * 비틀즈 @ 가 1969년 앨범 《Abbey Road》에 담은 노래다.
+        To ->       @ * 모임 * 비틀즈 @와 # ^ 사람 ^ 조지 해리슨 #의 관계 [SEP] 〈Something〉는 # ^ 사람 ^ 조지 해리슨 # 이 쓰고 @ * 모임 * 비틀즈 @ 가 1969년 앨범 《Abbey Road》에 담은 노래다.
+        """
+        
+        type2korean = {'PER' : '사람',
+                       'ORG' : '모임',
+                       'DAT' : '날짜',
+                       'NOH' : '숫자',
+                       'POH' : '명사',
+                       'LOC' : '장소'}        
+        
+        for _, row in df.iterrows():
+            subject_entity = row["subject_entity"]
+            subject_type = type2korean[row["subject_type"]]
+            object_entity = row["object_entity"]
+            object_type = type2korean[row["object_type"]]
+            
+            row["sentence"] = f"@ * {subject_type} * {subject_entity} @와 # ^ {object_type} ^ {object_entity} #의 관계 [SEP] " + row["sentence"]
+        
+        return df
+
+    def quering_with_detail(self, df):
+        """
+        add_entity_tokens_detail 뒤에 사용할 수 있는 버전의 quering           
+        From ->       〈Something〉는 # ^ PER ^ 조지 해리슨 # 이 쓰고 @ * ORG * 비틀즈 @ 가 1969년 앨범 《Abbey Road》에 담은 노래다.
+        To ->       @ * ORG * 비틀즈 @와 # ^ PER ^ 조지 해리슨 #의 관계 [SEP] 〈Something〉는 # ^ PER ^ 조지 해리슨 # 이 쓰고 @ * ORG * 비틀즈 @ 가 1969년 앨범 《Abbey Road》에 담은 노래다.
+        """
+        
+        # 아직 미구현
+        
         return df
     
     def add_others_tokens(self, df):
@@ -521,10 +771,9 @@ class DataCleaning():
     def dc_change_per_others(self,df):
         """ 
         문장에서 entity를 제외한 사람 이름을 [PER]로 바꿔주는 코드 (윤리적 이슈)
-
-        sentence를 변환
-        Pororo 라이브러리 사용 : https://github.com/kakaobrain/pororo
-        issue: torch v 1.6
+         sentence를 변환
+            Pororo 라이브러리 사용 : https://github.com/kakaobrain/pororo
+            issue: torch v 1.6
         
         Note: <데이터 예시>
             sentence: 특히 김동연 전 경제부총리를 비롯한 김두관 국회의원, 안규백 국회의원, 김종민 국회의원, 오제세 국회의원, 최운열 국회의원, 김정우 국회의원, 권칠승 국회의원, 맹성규 국회의원등 더불어민주당 국회의원 8명이 영상 축하 메세지를 보내 눈길을 끌었다.		
@@ -742,3 +991,19 @@ if __name__ == "__main__":
 
     new_train_df.to_csv('./dataset/new_train.csv', index=False)
     new_test_df.to_csv('./dataset/new_test.csv', index=False)
+    
+    types2labelnum = {('PER', 'PER'): {0, 6, 10, 12, 13, 14, 15, 16, 17, 21},
+                      ('PER', 'POH'): {0, 4, 6, 8, 11, 12, 14, 15, 17, 21, 23, 29},
+                      ('PER', 'ORG'): {0, 4, 6, 11, 12, 14, 15, 23, 29},
+                      ('PER', 'LOC'): {0, 6, 11, 15, 23, 26, 27},
+                      ('PER', 'DAT'): {0, 11, 15, 24, 25},
+                      ('PER', 'NOH'): {0},
+                      ('ORG', 'PER'): {0, 1, 3, 5, 28},
+                      ('ORG', 'POH'): {0, 1, 2, 3, 5, 7, 19, 20},
+                      ('ORG', 'ORG'): {0, 1, 2, 3, 5, 7, 19, 20, 28},
+                      ('ORG', 'LOC'): {0, 1, 2, 3, 5, 7, 19, 20},
+                      ('ORG', 'DAT'): {0, 3, 5, 18, 22},
+                      ('ORG', 'NOH'): {0, 3, 5, 9}}
+    
+    with open('./code/dict_types_to_labelnum.pkl', 'wb') as f:
+        pickle.dump(types2labelnum, f)
