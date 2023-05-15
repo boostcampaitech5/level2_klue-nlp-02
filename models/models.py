@@ -70,21 +70,45 @@ class Model(pl.LightningModule):
 
     def configure_optimizers(self):
         if self.CFG['train']['optim'] == 'SGD':
-            optimizer = self.optim(self.parameters(), lr=self.CFG['train']['LR'], momentum=0.9)
+            optimizer = self.optim(self.parameters(), lr=self.CFG['train']['LR']['LR_main'], momentum=0.9,weight_decay=1e-7)
         else:
-            optimizer = self.optim(self.parameters(), lr=self.CFG['train']['LR'])
-        # scheduler = torch.optim.lr_scheduler.LambdaLR(
-        #     optimizer=optimizer,
-        #     lr_lambda=lambda epoch: 0.95 ** epoch,
-        #     last_epoch=-1,
-        #     verbose=False)
-        # scheduler = torch.optim.lr_scheduler.StepLR(
-        #     optimizer=optimizer,
-        #     step_size=10,
-        #     gamma=0.7,
-        #     verbose=True)
-        scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=self.CFG['train']['LR'] / self.CFG['train']['LR_base'], max_lr=self.CFG['train']['LR'] / self.CFG['train']['LR_max'], step_size_up=self.CFG['train']['LR_step_up'], step_size_down=self.CFG['train']['LR_step_down'], cycle_momentum=False, mode='triangular')
+            optimizer = self.optim(self.parameters(), lr=self.CFG['train']['LR']['LR_main'])
 
+        if self.CFG['train']['LR'] == 'LambdaLR':
+            scheduler = torch.optim.lr_scheduler.LambdaLR(
+                optimizer=optimizer,
+                lr_lambda=lambda epoch: 0.95 ** epoch,
+                last_epoch=-1,
+                verbose=False)
+        elif self.CFG['train']['LR'] == 'StepLR':
+            scheduler = torch.optim.lr_scheduler.StepLR(
+                optimizer=optimizer,
+                step_size=10,
+                gamma=0.7,
+                verbose=True)
+        elif self.CFG['train']['LR'] == 'CyclicLR':
+            scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=self.CFG['train']['LR']['LR_main'] / self.CFG['train']['LR']['LR_base'], 
+                                                          max_lr=self.CFG['train']['LR']['LR_main'] / self.CFG['train']['LR']['LR_max'], 
+                                                          step_size_up=self.CFG['train']['LR']['LR_step_up'], 
+                                                          step_size_down=self.CFG['train']['LR']['LR_step_down'], cycle_momentum=False, mode='exp_range')
+        elif self.CFG['train']['LR'] == 'ExponentialLR':
+            scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.5,verbose=True)
+        elif self.CFG['train']['LR'] == 'WarmupConstantLR':
+            class WarmupConstantLR(torch.optim.lr_scheduler.LambdaLR):
+                """ Linear warmup and then constant.
+                    Linearly increases learning rate schedule from 0 to 1 over `warmup_steps` training steps.
+                    Keeps learning rate schedule equal to 1. after warmup_steps.
+                """
+                def __init__(self, optimizer, warmup_steps, last_epoch=-1):
+
+                    def lr_lambda(step):
+                        if step < warmup_steps:
+                            return float(step) / float(max(1.0, warmup_steps))
+                        return 1.
+
+                    super(WarmupConstantLR, self).__init__(optimizer, lr_lambda, last_epoch=last_epoch)
+
+            scheduler = WarmupConstantLR(optimizer, warmup_steps=self.CFG['train']['LR']['warmupconstantLR_step'])
         lr_scheduler = {
             'scheduler': scheduler,
             'name': 'LR_schedule'

@@ -53,7 +53,7 @@ if __name__ == "__main__":
                                  dirpath=f"{save_path}/checkpoints",
                                  filename="{epoch}-{val_micro_f1_Score:.4f}",
                                  mode='max')
-    lr_monitor = LearningRateMonitor(logging_interval='step')
+    lr_monitor = LearningRateMonitor()
     callbacks = [checkpoint,lr_monitor]
     # Earlystopping
     if CFG['option']['early_stop']:
