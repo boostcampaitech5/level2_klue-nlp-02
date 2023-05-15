@@ -5,7 +5,7 @@ import pytorch_lightning as pl
 import pickle
 
 from utils import metrics
-from utils.utils import load_types2labelnum
+from utils.data_controller import load_types2labelnum
 from . import train
 
 def focal_loss(logits, y, sub_obj_types, types2labelnum, alpha=0.5, gamma=2., penalty_scale=1):
@@ -109,7 +109,7 @@ class Model(pl.LightningModule):
             output = torch.cat((hidden[0], hidden[1]), dim=1)
 
             # Pass the output through a fully connected layer
-            output['logits'] = self.fc(output)
+            outputs['logits'] = self.fc(output)
         
         return outputs
 
