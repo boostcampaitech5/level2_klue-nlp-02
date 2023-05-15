@@ -87,10 +87,36 @@ class Dataloader(pl.LightningDataModule):
         )
 
         return inputs
+    
+    def short_tokenizing(self, x):
+        """ 토크나이징 함수
+
+        Note:   원래 x['sentence'] 리스트를 토크나이저에 인자로 집어넣습니다.
+                inputs는 따라서 input_ids, attention_mask, token_type_ids가 각각 포함된 배열형태로 구성됩니다.
+
+        Arguments:
+        x: pd.DataFrame
+
+        Returns:
+        inputs: Dict({'input_ids', 'token_type_ids', 'attention_mask'}), 각 tensor(num_data, max_length)
+        """
+        inputs = self.tokenizer(
+            list(x['sentence']),
+            return_tensors='pt',
+            padding=True,
+            truncation=True,
+            max_length=self.CFG['train']['token_max_len'],
+            add_special_tokens=True,
+        )
+
+        return inputs
 
     def preprocessing(self, x, train=False):
         DC = DataCleaning(self.CFG['select_DC'])
         DA = DataAugmentation(self.CFG['select_DA'])
+        # 선택한 토크나이징 방법에 따라 동적으로 작동
+        tokenizing_method_name = 'self.short_tokenizing' if self.CFG['option']['short_tokenizing'] else 'self.tokenizing'
+        tokenizing_method = eval(tokenizing_method_name)
 
         if train:
             x = DC.process(x, train=True)
@@ -105,10 +131,10 @@ class Dataloader(pl.LightningDataModule):
                                                               shuffle=self.CFG['train']['shuffle'],
                                                               random_state=self.CFG['seed'])
             
-            train_inputs = self.tokenizing(train_x)
+            train_inputs = tokenizing_method(train_x)
             train_targets = [self.label2num[label] for label in train_y]
 
-            val_inputs = self.tokenizing(val_x)
+            val_inputs = tokenizing_method(val_x)
             val_targets = [self.label2num[label] for label in val_y]
 
             return (train_inputs, train_targets, train_x[['subject_type', 'object_type']]), (val_inputs, val_targets, val_x[['subject_type', 'object_type']])
@@ -116,7 +142,7 @@ class Dataloader(pl.LightningDataModule):
             x = DC.process(x)
 
             # 텍스트 데이터 토큰화
-            test_inputs = self.tokenizing(x)
+            test_inputs = tokenizing_method(x)
         
             return test_inputs
 
@@ -323,6 +349,45 @@ class DataCleaning():
                     sentence = sentence[:idx+1] + f" [/{token}] " + sentence[idx+1:]
                 else:
                     sentence = sentence[:idx] + f"[{token}] " + sentence[idx:]
+                    trigger = not trigger
+            
+            new_sentence.append(sentence)
+        df['sentence'] = new_sentence
+
+        return df
+    
+    def add_only_punct(self, df):
+        """
+        @ : Subject
+        * : Subject_type
+        # : Object
+        ^ : Object_type
+        
+        short_tokenizing과 함께 쓸 것을 권장.        
+                
+        Ex)
+        From ->     〈Something〉는 조지 해리슨이 쓰고 비틀즈가 1969년 앨범 《Abbey Road》에 담은 노래다.
+        To ->       〈Something〉는 # ^ [PER] ^ 조지 해리슨 # 이 쓰고 @ * [ORG] * 비틀즈 @ 가 1969년 앨범 《Abbey Road》에 담은 노래다.
+        """
+        
+        new_sentence = []
+        for _, row in df.iterrows():
+            sentence = row["sentence"]
+            sub_type = '* [' + row["sub_type"] + '] * '
+            obj_type = '^ [' + row["obj_type"] + '] ^ '
+            
+            trigger = True if row['object_end_idx'] > row['subject_end_idx'] else False
+
+            for check, idx in enumerate(sorted([row['subject_start_idx'], row['subject_end_idx'], row['object_start_idx'], row['object_end_idx']], reverse=True)):
+                if trigger:
+                    token = " # "
+                else:
+                    token = " @ "
+
+                if check % 2 == 0:
+                    sentence = sentence[:idx+1] + token + sentence[idx+1:]
+                else:
+                    sentence = sentence[:idx] + token + obj_type if trigger else sub_type + sentence[idx:]
                     trigger = not trigger
             
             new_sentence.append(sentence)

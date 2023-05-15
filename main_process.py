@@ -39,6 +39,7 @@ if __name__ == "__main__":
     tokenizer.add_special_tokens({
         'additional_special_tokens': special_tokens_list
     })
+    
     dataloader = data_controller.Dataloader(tokenizer, CFG)
     LM = AutoModelForSequenceClassification.from_pretrained(
         pretrained_model_name_or_path=CFG['train']['model_name'], num_labels=30, output_hidden_states=CFG['train']['LSTM']['Do'])
