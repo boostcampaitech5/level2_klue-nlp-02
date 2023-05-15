@@ -7,7 +7,7 @@ import pickle
 from utils import metrics
 
 
-def focal_loss(logits, y, sub_obj_types, types2labelnum, alpha=1., gamma=2., penalty_scale=0.5):
+def focal_loss(logits, y, sub_obj_types, types2labelnum, alpha=0.5, gamma=2., penalty_scale=1):
     """
     logits = (batch_size, class_num)의 tensor
     y = (batch_size, )의 tensor
@@ -24,11 +24,9 @@ def focal_loss(logits, y, sub_obj_types, types2labelnum, alpha=1., gamma=2., pen
     y_one_hot.scatter_(1, y.unsqueeze(1), 1)  # y_ont_hot = (batch_size, class_num)
 
     # 원래 Focal Loss 논문에서 제시한 대로 구현한 basic_loss
-    log_prob = F.log_softmax(logits, dim=-1)
-    prob = torch.exp(log_prob)
-    basic_loss = F.nll_loss((-1 * alpha) * ((1 - prob) ** gamma) * log_prob, 
-                            y,
-                            reduction = 'mean') # tensor([scalar])
+    ce_loss = torch.nn.CrossEntropyLoss(reduction = 'none')(logits, y) # ce_loss (batch_size, )
+    pt = torch.exp(-ce_loss)
+    basic_loss = torch.mean(alpha * ((1-pt) ** gamma) * ce_loss)  # tensor([scalar])
 
     # Penalty 계산을 위한 binary cross entropy loss 계산 
     penalty_loss = torch.nn.functional.binary_cross_entropy_with_logits(logits, y_one_hot, reduction='none')  # penalty_loss = (batch_size, class_num)
