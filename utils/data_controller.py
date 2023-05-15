@@ -136,6 +136,8 @@ class Dataloader(pl.LightningDataModule):
 
             val_inputs = tokenizing_method(val_x)
             val_targets = [self.label2num[label] for label in val_y]
+            val_types = (val_x['subject_type'].apply(lambda x:type_dict[x]).tolist(), 
+                         val_x['object_type'].apply(lambda x:type_dict[x]).tolist())        # ([sub_types], [obj_types])
 
             return (train_inputs, train_targets, train_x[['subject_type', 'object_type']]), (val_inputs, val_targets, val_x[['subject_type', 'object_type']])
         else:
@@ -638,7 +640,7 @@ class DataAugmentation():
 
         return pd.concat([auto_df, cross_df], ignore_index=True)
 
-    def sub_obj_change_augment(df):
+    def sub_obj_change_augment(self, df):
         """
         Note:   (sub, obj) 쌍을 같은 라벨, 같은 sub-type, 같은 obj-type 을 가지고 있는 
                 다른 문장의 (sub, obj) 를 교환하는 형태로 데이터를 증강시킵니다.
@@ -721,6 +723,13 @@ def load_num2label():
         num2label = pickle.load(f)
     
     return num2label
+
+
+def load_types2labelnum():
+    with open('./code/dict_types_to_labelnum.pkl', 'rb') as f:
+        types2labelnum = pickle.load(f)
+    
+    return types2labelnum
 
 
 if __name__ == "__main__":
