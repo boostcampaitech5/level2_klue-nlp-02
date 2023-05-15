@@ -601,14 +601,21 @@ class DataCleaning():
                 
         Ex)
         From ->     〈Something〉는 조지 해리슨이 쓰고 비틀즈가 1969년 앨범 《Abbey Road》에 담은 노래다.
-        To ->       〈Something〉는 # ^ [PER] ^ 조지 해리슨 # 이 쓰고 @ * [ORG] * 비틀즈 @ 가 1969년 앨범 《Abbey Road》에 담은 노래다.
+        To ->       〈Something〉는 # ^ 사람 ^ 조지 해리슨 # 이 쓰고 @ * 모임 * 비틀즈 @ 가 1969년 앨범 《Abbey Road》에 담은 노래다.
         """
+        
+        type2korean = {'PER' : '사람',
+                       'ORG' : '모임',
+                       'DAT' : '날짜',
+                       'NOH' : '숫자',
+                       'POH' : '명사',
+                       'LOC' : '장소'}
         
         new_sentence = []
         for _, row in df.iterrows():
             sentence = row["sentence"]
-            sub_type = '* [' + row["subject_type"] + '] * '
-            obj_type = '^ [' + row["object_type"] + '] ^ '
+            sub_type = '* ' + type2korean[row["subject_type"]] + ' * '
+            obj_type = '^ ' + type2korean[row["object_type"]] + ' ^ '
             
             trigger = True if row['object_end_idx'] > row['subject_end_idx'] else False
 
@@ -632,15 +639,22 @@ class DataCleaning():
     def quering_with_punct(self, df):
         """
         add_only_punct 뒤에 사용할 수 있는 버전의 quering           
-        From ->       〈Something〉는 # ^ PER ^ 조지 해리슨 # 이 쓰고 @ * ORG * 비틀즈 @ 가 1969년 앨범 《Abbey Road》에 담은 노래다.
-        To ->       @ * ORG * 비틀즈 @와 # ^ PER ^ 조지 해리슨 #의 관계 [SEP] 〈Something〉는 # ^ PER ^ 조지 해리슨 # 이 쓰고 @ * ORG * 비틀즈 @ 가 1969년 앨범 《Abbey Road》에 담은 노래다.
+        From ->       〈Something〉는 # ^ 사람 ^ 조지 해리슨 # 이 쓰고 @ * 모임 * 비틀즈 @ 가 1969년 앨범 《Abbey Road》에 담은 노래다.
+        To ->       @ * 모임 * 비틀즈 @와 # ^ 사람 ^ 조지 해리슨 #의 관계 [SEP] 〈Something〉는 # ^ 사람 ^ 조지 해리슨 # 이 쓰고 @ * 모임 * 비틀즈 @ 가 1969년 앨범 《Abbey Road》에 담은 노래다.
         """
+        
+        type2korean = {'PER' : '사람',
+                       'ORG' : '모임',
+                       'DAT' : '날짜',
+                       'NOH' : '숫자',
+                       'POH' : '명사',
+                       'LOC' : '장소'}        
         
         for _, row in df.iterrows():
             subject_entity = row["subject_entity"]
-            subject_type = row["subject_type"]
+            subject_type = type2korean[row["subject_type"]]
             object_entity = row["object_entity"]
-            object_type = row["object_type"]
+            object_type = type2korean[row["object_type"]]
             
             row["sentence"] = f"@ * {subject_type} * {subject_entity} @와 # ^ {object_type} ^ {object_entity} #의 관계 [SEP] " + row["sentence"]
         
