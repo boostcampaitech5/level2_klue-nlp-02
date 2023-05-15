@@ -58,7 +58,7 @@ class Model(pl.LightningModule):
         self.sep_id = tokenizer.sep_token_id    # Separator token ID
         self.ent_id = tokenizer.convert_tokens_to_ids('[ENT]')
         
-        self.loss_func = torch.nn.CrossEntropyLoss()
+        self.loss_func = torch.nn.CrossEntropyLoss(label_smoothing = CFG['train']['lossF']['smooth_scale'])
         self.optim = eval("torch.optim." + self.CFG['train']['optim'])
         
         # LSTM layer 초기화
@@ -120,9 +120,7 @@ class Model(pl.LightningModule):
             attention_mask=x['attention_mask'],
             token_type_ids=x['token_type_ids']
         )
-        loss = self.loss_func(outputs['logits'],
-                              y,
-                              label_smoothing = self.CFG['train']['lossF']['smooth_scale']) if self.CFG['train']['lossF']['name'] != 'focal_loss' \
+        loss = self.loss_func(outputs['logits'], y) if self.CFG['train']['lossF']['name'] != 'focal_loss' \
         else focal_loss(outputs['logits'], y, sub_obj_types, self.types2labelnum, self.CFG['train']['lossF']['focal_loss_scale'])
 
         # multi-task learning: type classify 학습

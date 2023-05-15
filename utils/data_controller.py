@@ -1003,7 +1003,7 @@ if __name__ == "__main__":
     test_df = pd.read_csv('./dataset/test/test_data.csv')
     
     # 중복 제거
-    train_df = train_df[['sentence','subject_entity','object_entity','source','label']].drop_duplicates()
+    train_df = train_df.iloc[train_df[['sentence','subject_entity','object_entity','source','label']].drop_duplicates().index]
 
     # entity_parsing이 적용된 DataFrame 파일 만들기
     new_train_df = DataCleaning([]).entity_parsing(train_df.copy(deep=True))
