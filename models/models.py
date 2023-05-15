@@ -61,19 +61,20 @@ class Model(pl.LightningModule):
         self.loss_func = eval("torch.nn." + self.CFG['train']['lossF'])()
         self.optim = eval("torch.optim." + self.CFG['train']['optim'])
         self.types2labelnum = load_types2labelnum() if self.CFG['train']['focal_loss'] else None
-        self.lstm = torch.nn.LSTM(input_size = self.LM.model_config.hidden_size,
-                                  hidden_size = self.LM.model_config.hidden_size,
+        self.lstm = torch.nn.LSTM(input_size = self.LM.config.hidden_size,
+                                  hidden_size = self.LM.config.hidden_size,
                                   num_layers = 4,
                                   dropout = 0.1,
                                   batch_first = True,
                                   bidirectional = True) if self.CFG['train']['LSTM']['Do'] else None
-        self.fc = torch.nn.Linear(self.LM.model_config.hidden_size * 2, 30) if self.CFG['train']['LSTM']['Do'] else None
+        self.fc = torch.nn.Linear(self.LM.config.hidden_size * 2, 30) if self.CFG['train']['LSTM']['Do'] else None
 
     def forward(self, input_ids, attention_mask, token_type_ids):
         outputs = self.LM(
             input_ids=input_ids,
             attention_mask=attention_mask,
-            token_type_ids=token_type_ids
+            token_type_ids=token_type_ids,
+            output_hidden_states = True
         )
         if not self.CFG['train']['LSTM']['Do']:
             return outputs['logits']
