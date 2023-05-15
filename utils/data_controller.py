@@ -541,8 +541,8 @@ class DataAugmentation():
                             'org:member_of' : 'org:members',
                             'org:top_members/employees' : 'per:employee_of',
                             'per:employee_of' : 'org:top_members/employees'}
-        auto_df = df[df['label'].isin(auto_augmentation)]
-        cross_df = df[df['label'].isin(cross_augmentation.keys())]
+        auto_df = df[df['label'].isin(auto_augmentation)].copy()
+        cross_df = df[df['label'].isin(cross_augmentation.keys())].copy()
 
         auto_df['subject_entity'], auto_df['object_entity'] = auto_df['object_entity'].copy(), auto_df['subject_entity'].copy()
 
