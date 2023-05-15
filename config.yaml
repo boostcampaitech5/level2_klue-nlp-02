@@ -6,13 +6,15 @@ train:
   epoch: 100
   batch_size: 32
   LR: 
-    name: 스케줄러명 # LambdaLR, StepLR, CyclicLR, ExponentialLR, WarmupConstantLR 
+    name: 스케줄러명 # LambdaLR, StepLR, CyclicLR, ExponentialLR, WarmupConstantLR , WarmupDecayLR
     lr: 0.000001
     base: 20 # CyclicLR를 쓴다면, LR에 대한 min_lr을 적어주세요(20 == LR/20)
     max: 5 # CyclicLR를 쓴다면, LR에 대한 max_lr을 적어주세요(5 == LR/5)
-    step_up: 5 # CyclicLR를 쓴다면, warmup epoch를 적어주세요
-    step_down: 5 # CyclicLR를 쓴다면, cooldown epoch를 적어주세요 (단, up+down은 epoch과 동일해야 함)
+    step_up: 5 # CyclicLR를 쓴다면, warmup steps를 적어주세요
+    step_down: 5 # CyclicLR를 쓴다면, cooldown steps를 적어주세요 (단, up+down은 epoch과 동일해야 함)
     warmupconstantLR_step: 3
+    warmupdecayLR_warmup:  400 # step 기준으로 계산
+    warmupdecayLR_total:  4200 # step 기준으로 계산
     interval: step # epoch
   lossF:
     name: CrossEntropyLoss # focal_loss
