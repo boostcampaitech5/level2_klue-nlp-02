@@ -231,7 +231,7 @@ class Dataloader(pl.LightningDataModule):
             self.val_dataset = Dataset(val[0], val[1], val[2])
         else:
             # 평가 데이터 호출
-            predict_inputs = self.preprocessing(self.predict_x)
+            predict_inputs = self.preprocessing(self.predict_x.copy())
             self.predict_dataset = Dataset(predict_inputs)
 
     def train_dataloader(self):
