@@ -7,11 +7,11 @@ import pytorch_lightning as pl
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
-from konlpy.tag import Okt
-from pykospacing import Spacing
-from hanspell import spell_checker
-from pororo import Pororo
-from hangulize import hangulize
+# from konlpy.tag import Okt
+# from pykospacing import Spacing
+# from hanspell import spell_checker
+# from pororo import Pororo
+# from hangulize import hangulize
 
 
 class Dataset(Dataset):
@@ -19,9 +19,10 @@ class Dataset(Dataset):
     Dataloader에서 불러온 데이터를 Dataset으로 만들기
     """
 
-    def __init__(self, inputs, targets=[]):
+    def __init__(self, inputs, targets=[], sub_obj_types=[]):
         self.inputs = inputs
         self.targets = targets
+        self.sub_obj_types = sub_obj_types
 
     def __getitem__(self, idx):
         inputs = {key: val[idx].clone().detach()
@@ -29,8 +30,9 @@ class Dataset(Dataset):
 
         if self.targets:
             targets = torch.tensor(self.targets[idx])
-
-            return inputs, targets
+            sub_obj_types = tuple(self.sub_obj_types.iloc[idx])
+            
+            return inputs, targets, sub_obj_types
         else:
             return inputs
 
@@ -109,7 +111,7 @@ class Dataloader(pl.LightningDataModule):
             val_inputs = self.tokenizing(val_x)
             val_targets = [self.label2num[label] for label in val_y]
 
-            return (train_inputs, train_targets), (val_inputs, val_targets)
+            return (train_inputs, train_targets, train_x[['subject_type', 'object_type']]), (val_inputs, val_targets, val_x[['subject_type', 'object_type']])
         else:
             x = DC.process(x)
 
@@ -123,8 +125,8 @@ class Dataloader(pl.LightningDataModule):
             # 학습 데이터 준비
             train, val = self.preprocessing(self.train_df, train=True)
             
-            self.train_dataset = Dataset(train[0], train[1])
-            self.val_dataset = Dataset(val[0], val[1])
+            self.train_dataset = Dataset(train[0], train[1], train[2])
+            self.val_dataset = Dataset(val[0], val[1], val[2])
         else:
             # 평가 데이터 호출
             predict_inputs = self.preprocessing(self.predict_x)
@@ -193,6 +195,57 @@ class DataCleaning():
         
         return df
     
+    def normalize_class(self, df):
+        """ 특정 label에 대해 들어올 수 없는 entity_type이 기재되어있는 경우,
+        해당 type을 올바른 entity_type으로 바꾸어 주고자 함.
+        
+        Note: 어떤 label에 대해 어떤 entity_type이 허용되는지는 CJW_vis.ipynb 참고바람
+
+        Arguments:
+        df: (entity_parsing이 끝난) normalize_class을 수행하고자 하는 DataFrame
+
+        Return:
+        df: normalize_class 작업이 완료된 DataFrame
+        """
+
+        if 100 in df['label']:  # test.csv에는 label이 모두 100이다.
+            return df
+        
+        allowed_obj_for_class = \
+        {'org:founded_by' : {'allowed' : set(['PER', 'ORG']), 'change_into' : 'ORG'},
+        'org:member_of' : {'allowed' : set(['ORG', 'LOC', 'POH']), 'change_into' : 'ORG'},
+        'org:members' : {'allowed' : set(['ORG', 'LOC', 'POH']), 'change_into' : 'ORG'},
+        'org:place_of_headquarters' : {'allowed' : set(['ORG', 'LOC', 'POH']), 'change_into' : 'LOC'},
+        'org:political/religious_affiliation' : {'allowed' : set(['ORG', 'LOC', 'POH']), 'change_into' : 'ORG'},
+        'org:product' : {'allowed' : set(['ORG', 'LOC', 'POH', 'PER']), 'change_into' : 'POH'},
+        'org:top_members/employees' : {'allowed' : set(['ORG', 'LOC', 'POH', 'PER']), 'change_into' : 'PER'},
+        'per:alternate_names' : {'allowed' : set(['ORG','POH', 'PER']), 'change_into' : 'PER'},
+        'per:children' : {'allowed' : set(['PER']), 'change_into' : 'PER'},
+        'per:colleagues' : {'allowed' : set(['PER', 'POH', 'ORG']), 'change_into' : 'PER'},
+        'per:date_of_birth' : {'allowed' : set(['DAT']), 'change_into' : 'DAT'},
+        'per:date_of_death' : {'allowed' : set(['DAT']), 'change_into' : 'DAT'},
+        'per:employee_of' : {'allowed' : set(['PER', 'POH', 'ORG', 'LOC']), 'change_into' : 'ORG'},
+        'per:origin' : {'allowed' : set(['LOC', 'POH', 'DAT', 'ORG']), 'change_into' : 'ORG'},
+        'per:other_family' : {'allowed' : set(['PER', 'POH']), 'change_into' : 'POH'},
+        'per:parents' : {'allowed' : set(['PER']), 'change_into' : 'PER'},
+        'per:place_of_birth' : {'allowed' : set(['LOC']), 'change_into' : 'LOC'},
+        'per:place_of_death' : {'allowed' : set(['LOC']), 'change_into' : 'LOC'},
+        'per:place_of_residence' : {'allowed' : set(['LOC', 'ORG', 'POH', 'DAT']), 'change_into' : 'LOC'},
+        'per:product' : {'allowed' : set(['POH']), 'change_into' : 'POH'},
+        'per:religion' : {'allowed' : set(['POH', 'ORG']), 'change_into' : 'ORG'},
+        'per:siblings' : {'allowed' : set(['PER']), 'change_into' : 'PER'},
+        'per:spouse' : {'allowed' : set(['PER']), 'change_into' : 'PER'},
+        'per:title' : {'allowed' : set(['PER', 'POH']), 'change_into' : 'POH'}
+        }
+            
+        for label, obj_info in allowed_obj_for_class.items():
+            df.loc[(df['label'] == label) & (~df['object_type'].isin(obj_info['allowed'])), 'object_type'] = obj_info['change_into']
+
+        df.loc[df['label'].str.startswith('per'), 'subject_type'] = 'PER'
+        df.loc[df['label'].str.startswith('org'), 'subject_type'] = 'ORG'
+        
+        return df
+                
     def pronounce_japan(self, df):
         """ sentence, subject_entity, object_entity 컬럼에서 일본어 발음을 한글로 변환
         hangulize 라이브러리 사용
@@ -238,6 +291,8 @@ class DataCleaning():
                 df.loc[idx,'sentence']=row['sentence'][:row['subject_start_idx']]+'[SUB]'+row['sentence'][row['subject_end_idx']+1:row['object_start_idx']]+'[OBJ]'+row['sentence'][row['object_end_idx']+1:]
             else:
                 df.loc[idx,'sentence']=row['sentence'][:row['object_start_idx']]+'[OBJ]'+row['sentence'][row['object_end_idx']+1:row['subject_start_idx']]+'[SUB]'+row['sentence'][row['subject_end_idx']+1:]
+        
+        return df
     
     def remove_duplicated(self, df):
         """
@@ -387,7 +442,7 @@ class DataCleaning():
             df: entitiy로 들어가는 이름 제외한 사람 이름을 [PER]로 변환하는 작업이 완료된 DataFrame
         """
 
-        ner = Pororo(task="ner", lang="ko")   # ner 수행해 주는 pororo기능 object화
+        ner = Pororo(task="ner", lang="ko")  # ner 수행해 주는 pororo기능 object화
 
         def per_change(sen):     
             final_sen = ''
@@ -445,10 +500,56 @@ class DataAugmentation():
             df = pd.concat([df, aug_df])
 
         return df
-
+    
     """
     data augmentation 코드
     """
+    
+    def swap_sentence(self, df):
+        """ subject/object swap을 통해 데이터 증강이 가능.
+        그러므로 swap이 가능한 문장은 swap을 수행, 데이터를 증강하고자 함
+        Note: <swap이 가능한 문장의 classes> {
+            colleagues -> colleagues
+            other_family -> other_family
+            siblings -> siblings
+            spouse -> spouse
+
+            alternate_names -> alternate_names
+            ------------------------------
+            children <-> parents
+            members <-> member_of
+
+            top_members/employees <-> employee_of
+            }
+
+        Arguments:
+        df: (entity_parsing이 끝난) 문장 swap augmentation을 수행하고자 하는 DataFrame
+
+        Return:
+        df: augmentation 작업이 완료된 DataFrame
+        """
+        
+        auto_augmentation = set(['org:alternate_names',
+                                'per:alternate_names',
+                                'per:colleagues',
+                                'per:other_family',
+                                'per:siblings',
+                                'per:spouse'])
+        cross_augmentation = {'per:children' : 'per:parents',
+                            'per:parents' : 'per:children',
+                            'org:members' : 'org:member_of',
+                            'org:member_of' : 'org:members',
+                            'org:top_members/employees' : 'per:employee_of',
+                            'per:employee_of' : 'org:top_members/employees'}
+        auto_df = df[df['label'].isin(auto_augmentation)].copy()
+        cross_df = df[df['label'].isin(cross_augmentation.keys())].copy()
+
+        auto_df['subject_entity'], auto_df['object_entity'] = auto_df['object_entity'].copy(), auto_df['subject_entity'].copy()
+
+        cross_df['subject_entity'], cross_df['object_entity'] = cross_df['object_entity'].copy(), cross_df['subject_entity'].copy()
+        cross_df['label'] = cross_df['label'].map(cross_augmentation)
+
+        return pd.concat([auto_df, cross_df], ignore_index=True)
 
     def sub_obj_change_augment(df):
         """
