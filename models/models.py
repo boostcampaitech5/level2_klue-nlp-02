@@ -7,7 +7,7 @@ import pickle
 from utils import metrics
 
 
-def focal_loss(logits, y, sub_obj_types, types2labelnum, alpha=0.25, gamma=2., penalty_scale=1):
+def focal_loss(logits, y, sub_obj_types, types2labelnum, alpha=0.5, gamma=2., penalty_scale=1):
     """
     logits = (batch_size, class_num)의 tensor
     y = (batch_size, )의 tensor
@@ -166,7 +166,7 @@ class Model(pl.LightningModule):
         #     gamma=0.7,
         #     verbose=True)
         # scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=self.CFG['train']['LR'] / self.CFG['train']['LR_base'], max_lr=self.CFG['train']['LR'] / self.CFG['train']['LR_max'], step_size_up=self.CFG['train']['LR_step_up'], step_size_down=self.CFG['train']['LR_step_down'], cycle_momentum=False, mode='triangular')
-        scheduler = WarmupConstantSchedule(optimizer, warmup_steps=10)
+        scheduler = WarmupConstantSchedule(optimizer, warmup_steps=3)
 
         lr_scheduler = {
             'scheduler': scheduler,
@@ -286,8 +286,9 @@ class WarmupConstantSchedule(torch.optim.lr_scheduler.LambdaLR):
     def __init__(self, optimizer, warmup_steps, last_epoch=-1):
 
         def lr_lambda(step):
-            if step < warmup_steps:
-                return float(step) / float(max(1.0, warmup_steps))
+            step += 1
+            if step < warmup_steps + 1:
+                return float(step) / float(max(1.0, warmup_steps + 1))
             return 1.
 
         super(WarmupConstantSchedule, self).__init__(optimizer, lr_lambda, last_epoch=last_epoch)
