@@ -88,7 +88,9 @@ class Model(pl.LightningModule):
                 lstm_outputs, (hidden, cell) = self.lstm(outputs['hidden_states'][-1])
             else:
                 # Find the position of the [SEP] token
-                sep_positions = (input_ids == self.sep_id).nonzero(as_tuple=True)[1]
+                sep_positions = []
+                for seq in input_ids:
+                    sep_positions.append((seq == self.sep_id).nonzero(as_tuple=True)[0][0])
 
                 # Prepare the sequences for LSTM
                 lstm_input = []
