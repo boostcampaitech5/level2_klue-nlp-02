@@ -20,12 +20,16 @@ class Dataset(Dataset):
     Dataloader에서 불러온 데이터를 Dataset으로 만들기
     """
 
-    def __init__(self, inputs, targets=[], sub_obj_types=[]):
+    def __init__(self, inputs, targets=[], sub_obj_types=[], no_valid = False):
         self.inputs = inputs
         self.targets = targets
         self.sub_obj_types = sub_obj_types
+        self.no_valid = no_valid
 
     def __getitem__(self, idx):
+        if self.no_valid:
+            return None, None, None
+        
         inputs = {key: val[idx].clone().detach()
                   for key, val in self.inputs.items()}
 
@@ -38,6 +42,9 @@ class Dataset(Dataset):
             return inputs
         
     def __len__(self):
+        if self.no_valid:
+            return 1
+        
         return len(self.inputs['input_ids'])
         
 class ADVSDataset(Dataset):
@@ -161,6 +168,16 @@ class Dataloader(pl.LightningDataModule):
             x = DC.process(x, train=True)
             x = DA.process(x)
 
+            if self.CFG['train']['no_valid']:
+                train_x = x.drop(['label'], axis=1)  
+                train_y = x['label']
+                
+                train_inputs = tokenizing_method(train_x)
+                train_targets = [self.label2num[label] for label in train_y]
+                
+                return (train_inputs, train_targets, train_x[['subject_type', 'object_type']]), (None, None, None)
+                
+                
             if not self.CFG['train']['adverse_valid']:
                 train_x = x.drop(['label'], axis=1)
                 train_y = x['label']
@@ -228,7 +245,7 @@ class Dataloader(pl.LightningDataModule):
             train, val = self.preprocessing(self.train_df, train=True)
             
             self.train_dataset = Dataset(train[0], train[1], train[2])
-            self.val_dataset = Dataset(val[0], val[1], val[2])
+            self.val_dataset = Dataset(val[0], val[1], val[2], no_valid = self.CFG['train']['no_valid'])
         else:
             # 평가 데이터 호출
             predict_inputs = self.preprocessing(self.predict_x)

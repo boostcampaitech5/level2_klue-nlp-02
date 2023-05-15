@@ -58,11 +58,11 @@ class Model(pl.LightningModule):
         self.sep_id = tokenizer.sep_token_id    # Separator token ID
         self.ent_id = tokenizer.convert_tokens_to_ids('[ENT]')
         
-        self.loss_func = eval("torch.nn." + self.CFG['train']['lossF'])()
+        self.loss_func = torch.nn.CrossEntropyLoss()
         self.optim = eval("torch.optim." + self.CFG['train']['optim'])
         
         # LSTM layer 초기화
-        self.types2labelnum = load_types2labelnum() if self.CFG['train']['focal_loss'] else None
+        self.types2labelnum = load_types2labelnum() if self.CFG['train']['lossF']['name'] == 'focal_loss' else None
         self.lstm = torch.nn.LSTM(input_size = self.LM.config.hidden_size,
                                   hidden_size = self.LM.config.hidden_size,
                                   num_layers = 4,
@@ -89,7 +89,7 @@ class Model(pl.LightningModule):
             범위는 가장 앞 [CLS] 부터 처음으로 나오는 [SEP]까지만 수행하는 truncate와 문장 전체에 수행하는 not truncate가 있음
             """
             if not self.CFG['train']['LSTM']['truncate']:
-                lstm_outputs, (hidden, cell) = self.lstm(outputs['hidden_states'][-1])
+                lstm_outputs, (hidden, cell) = self.lstm(outputs['hidden_states'][-1])  # outputs['hidden_states'][-1] == (batch_size * seq_len * hidden_dim)
             else:
                 # Find the position of the [SEP] token
                 sep_positions = []
@@ -120,8 +120,10 @@ class Model(pl.LightningModule):
             attention_mask=x['attention_mask'],
             token_type_ids=x['token_type_ids']
         )
-        loss = self.loss_func(outputs['logits'], y) if not self.CFG['train']['focal_loss'] \
-        else focal_loss(outputs['logits'], y, sub_obj_types, self.types2labelnum, self.CFG['train']['focal_loss_scale'])
+        loss = self.loss_func(outputs['logits'],
+                              y,
+                              label_smoothing = self.CFG['train']['lossF']['smooth_scale']) if self.CFG['train']['lossF']['name'] != 'focal_loss' \
+        else focal_loss(outputs['logits'], y, sub_obj_types, self.types2labelnum, self.CFG['train']['lossF']['focal_loss_scale'])
 
         # multi-task learning: type classify 학습
         if "add_entity_tokens_base" in self.CFG['select_DC'] and self.CFG['train']['type_classify']:
@@ -132,22 +134,23 @@ class Model(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        x, y, _ = batch
-        outputs = self(
-            input_ids=x['input_ids'],
-            attention_mask=x['attention_mask'],
-            token_type_ids=x['token_type_ids']
-        )
-        loss = self.loss_func(outputs['logits'], y)
-        self.log("val_loss", loss)
+        if not self.CFG['train']['no_valid']:
+            x, y, _ = batch
+            outputs = self(
+                input_ids=x['input_ids'],
+                attention_mask=x['attention_mask'],
+                token_type_ids=x['token_type_ids']
+            )
+            loss = self.loss_func(outputs['logits'], y)
+            self.log("val_loss", loss)
 
-        metric = metrics.compute_metrics(
-            F.softmax(outputs['logits'], dim=-1), y)
-        self.log('val_micro_f1_Score', metric['micro f1 score'])
-        self.log('val_AUPRC', metric['auprc'])
-        self.log('val_acc', metric['accuracy'])
+            metric = metrics.compute_metrics(
+                F.softmax(outputs['logits'], dim=-1), y)
+            self.log('val_micro_f1_Score', metric['micro f1 score'])
+            self.log('val_AUPRC', metric['auprc'])
+            self.log('val_acc', metric['accuracy'])
 
-        return loss
+            return loss
 
     def predict_step(self, batch, batch_idx):
         x = batch
@@ -191,6 +194,7 @@ class Model(pl.LightningModule):
         
         lr_scheduler = {
             'scheduler': scheduler,
+            'interval' : self.CFG['train']['LR']['interval'],
             'name': self.CFG['train']['LR']['name']
         }
 
