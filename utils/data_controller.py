@@ -1,3 +1,4 @@
+import re
 import pickle
 import torch
 import pandas as pd
@@ -5,14 +6,13 @@ import pytorch_lightning as pl
 
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset, DataLoader
+from tqdm import tqdm
 # from konlpy.tag import Okt
 # from pykospacing import Spacing
 # from hanspell import spell_checker
 # from pororo import Pororo
-
-
 # from hangulize import hangulize
-import re
+
 
 class Dataset(Dataset):
     """
@@ -550,6 +550,64 @@ class DataAugmentation():
         cross_df['label'] = cross_df['label'].map(cross_augmentation)
 
         return pd.concat([auto_df, cross_df], ignore_index=True)
+
+    def sub_obj_change_augment(df):
+        """
+        Note:   (sub, obj) 쌍을 같은 라벨, 같은 sub-type, 같은 obj-type 을 가지고 있는 
+                다른 문장의 (sub, obj) 를 교환하는 형태로 데이터를 증강시킵니다.
+                train.csv에서 상대적으로 적은 obj-type을 가지는 POH, DAT, LOC 만을 증강시킵니다.
+                no_relation인 라벨은 증강시키지 않습니다.
+        
+        Arugments:
+        증강하고자 하는 dataframe
+                
+        Return:
+        Note 규칙 기반으로 새롭게 생성된 문장 dataframe
+        """
+        
+        label_list = sorted(list(df['label'].unique()))[1:]         # no_relation 제외
+        aug_obj_type = ['POH', 'DAT', 'LOC']
+        
+        df_copied = df.copy(deep=True)
+        copy_element = ['label', 'source', 'subject_start_idx', 
+                        'subject_end_idx', 'subject_type', 'object_start_idx', 'object_end_idx', 'object_type']
+        aug_dict = {key:[] for idx, key in enumerate(df.columns.tolist())}
+        
+        # 1. 특정 라벨 선택
+        for label in tqdm(label_list, desc="Augmentation by (sub, obj) change"):
+            # 2. Object type에서 POH, DAT, LOC 확인
+            for obj_type in aug_obj_type:
+                temp_df = df_copied[(df_copied['label'] == label) & (df_copied['object_type'] == obj_type)]
+                if len(temp_df) == 0:
+                    continue
+                
+                # 3. sub type - obj type 같을 때만 교체해서 증강
+                sub_type_list = sorted(list(temp_df['subject_type'].unique()))  # ['PER', 'ORG']
+                for sub_type in sub_type_list:
+                    # 4. (sub, obj) 쌍을 구하고
+                    tuple_list = temp_df[temp_df['subject_type'] == sub_type].apply(lambda x:(x['id'], x['subject_entity'], x['object_entity']), axis=1).tolist()
+                    
+                    # 5. 거꾸로 서로 교체. -> 데이터 2배 증가
+                    for idx, (id, sub_en_target, obj_en_target) in enumerate(tuple_list):
+                        sent_target = df_copied.loc[id]['sentence']
+                        
+                        sub_en_change = tuple_list[len(tuple_list)-idx-1][1]
+                        obj_en_chage = tuple_list[len(tuple_list)-idx-1][2]
+                        
+                        sent_change = sent_target.replace(sub_en_target, sub_en_change).replace(obj_en_target, obj_en_chage)
+                        
+                        aug_dict['id'].append(id)
+                        aug_dict['sentence'].append(sent_change)
+                        aug_dict['subject_entity'].append(sub_en_change)
+                        aug_dict['object_entity'].append(obj_en_chage)
+
+                        # 5-1. 변경하지 않는 컬럼 성분은 그냥 복붙.
+                        for c in copy_element:
+                            aug_dict[c].append(df.loc[id][c])
+                            
+        aug_df = pd.DataFrame(aug_dict)
+        
+        return aug_df
 
 
 def load_data():
