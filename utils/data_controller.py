@@ -351,15 +351,15 @@ class DataCleaning():
     def entity_mask_detail(self, df):
         """
         sentence, subject_entity, object_entity 컬럼에서 subject_entity와 object_entity에 마스킹 처리
-        [S:{type}] subject_entity [/S:{type}] → [SUB] 마스킹
-        [O:{type}] object_entity [/O:{type}] → [OBJ] 마스킹
+        [S:{type}] subject_entity [/S:{type}] → [S:{type}] 마스킹
+        [O:{type}] object_entity [/O:{type}] → [O:{type}] 마스킹
         
         *** add_entity_tokens_detail 함수를 먼저 적용해줘야 함! ***
 
         Note: <데이터 예시>
         〈Something〉는 [O:PER] 조지 해리슨 [/O:PER] 이 쓰고 [S:ORG] 비틀즈 [/S:ORG] 가 1969년 앨범 《Abbey Road》에 담은 노래다.
             ↓
-        〈Something〉는 [OBJ] 이 쓰고 [SUB] 가 1969년 앨범 《Abbey Road》에 담은 노래다.
+        〈Something〉는 [O:PER] 이 쓰고 [S:ORG] 가 1969년 앨범 《Abbey Road》에 담은 노래다.
         
         Arguments:
         df: add_entity_tokens_detail 함수를 적용한 DataFrame
@@ -367,10 +367,10 @@ class DataCleaning():
         Return:
         df: subject_entity와 object_entity에 마스킹 처리 작업이 완료된 DataFrame
         """
-        df['sentence']=df['sentence'].apply(lambda x: re.sub('\[S:.+?].+?\[/S:.+?]','[SUB]',x))
-        df['sentence']=df['sentence'].apply(lambda x: re.sub('\[O:.+?].+?\[/O:.+?]','[OBJ]',x))
-        df['subject_entity']='[SUB]'
-        df['object_entity']='[OBJ]'
+        df['sentence']=df['sentence'].apply(lambda x: re.sub(r'\[S:.+?].+?\[/S:.+?]',re.findall(r'\[S:.+?]',x)[0],x))
+        df['sentence']=df['sentence'].apply(lambda x: re.sub(r'\[O:.+?].+?\[/O:.+?]',re.findall(r'\[O:.+?]',x)[0],x))
+        df['subject_entity']=df['sentence'].apply(lambda x: re.findall(r'\[S:.+?]',x)[0])
+        df['object_entity']=df['sentence'].apply(lambda x: re.findall(r'\[O:.+?]',x)[0])
 
         return df
 
