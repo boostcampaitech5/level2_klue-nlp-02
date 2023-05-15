@@ -7,7 +7,7 @@ import pickle
 from utils import metrics
 
 
-def focal_loss(logits, y, sub_obj_types, types2labelnum, alpha=1., gamma=2., penalty_scale=0.5):
+def focal_loss(logits, y, sub_obj_types, types2labelnum, alpha=0.25, gamma=2., penalty_scale=1):
     """
     logits = (batch_size, class_num)의 tensor
     y = (batch_size, )의 tensor
@@ -24,11 +24,9 @@ def focal_loss(logits, y, sub_obj_types, types2labelnum, alpha=1., gamma=2., pen
     y_one_hot.scatter_(1, y.unsqueeze(1), 1)  # y_ont_hot = (batch_size, class_num)
 
     # 원래 Focal Loss 논문에서 제시한 대로 구현한 basic_loss
-    log_prob = F.log_softmax(logits, dim=-1)
-    prob = torch.exp(log_prob)
-    basic_loss = F.nll_loss((-1 * alpha) * ((1 - prob) ** gamma) * log_prob, 
-                            y,
-                            reduction = 'mean') # tensor([scalar])
+    ce_loss = torch.nn.CrossEntropyLoss(reduction = 'none')(logits, y) # ce_loss (batch_size, )
+    pt = torch.exp(-ce_loss)
+    basic_loss = torch.mean(alpha * ((1-pt) ** gamma) * ce_loss)  # tensor([scalar])
 
     # Penalty 계산을 위한 binary cross entropy loss 계산 
     penalty_loss = torch.nn.functional.binary_cross_entropy_with_logits(logits, y_one_hot, reduction='none')  # penalty_loss = (batch_size, class_num)
@@ -61,19 +59,20 @@ class Model(pl.LightningModule):
         self.loss_func = eval("torch.nn." + self.CFG['train']['lossF'])()
         self.optim = eval("torch.optim." + self.CFG['train']['optim'])
         self.types2labelnum = load_types2labelnum() if self.CFG['train']['focal_loss'] else None
-        self.lstm = torch.nn.LSTM(input_size = self.LM.model_config.hidden_size,
-                                  hidden_size = self.LM.model_config.hidden_size,
+        self.lstm = torch.nn.LSTM(input_size = self.LM.config.hidden_size,
+                                  hidden_size = self.LM.config.hidden_size,
                                   num_layers = 4,
                                   dropout = 0.1,
                                   batch_first = True,
                                   bidirectional = True) if self.CFG['train']['LSTM']['Do'] else None
-        self.fc = torch.nn.Linear(self.LM.model_config.hidden_size * 2, 30) if self.CFG['train']['LSTM']['Do'] else None
+        self.fc = torch.nn.Linear(self.LM.config.hidden_size * 2, 30) if self.CFG['train']['LSTM']['Do'] else None
 
     def forward(self, input_ids, attention_mask, token_type_ids):
         outputs = self.LM(
             input_ids=input_ids,
             attention_mask=attention_mask,
-            token_type_ids=token_type_ids
+            token_type_ids=token_type_ids,
+            output_hidden_states=True
         )
         if not self.CFG['train']['LSTM']['Do']:
             return outputs['logits']
@@ -166,7 +165,8 @@ class Model(pl.LightningModule):
         #     step_size=10,
         #     gamma=0.7,
         #     verbose=True)
-        scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=self.CFG['train']['LR'] / self.CFG['train']['LR_base'], max_lr=self.CFG['train']['LR'] / self.CFG['train']['LR_max'], step_size_up=self.CFG['train']['LR_step_up'], step_size_down=self.CFG['train']['LR_step_down'], cycle_momentum=False, mode='triangular')
+        # scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=self.CFG['train']['LR'] / self.CFG['train']['LR_base'], max_lr=self.CFG['train']['LR'] / self.CFG['train']['LR_max'], step_size_up=self.CFG['train']['LR_step_up'], step_size_down=self.CFG['train']['LR_step_down'], cycle_momentum=False, mode='triangular')
+        scheduler = WarmupConstantSchedule(optimizer, warmup_steps=10)
 
         lr_scheduler = {
             'scheduler': scheduler,
@@ -280,3 +280,14 @@ def load_types2labelnum():
         types2labelnum = pickle.load(f)
     
     return types2labelnum
+
+
+class WarmupConstantSchedule(torch.optim.lr_scheduler.LambdaLR):
+    def __init__(self, optimizer, warmup_steps, last_epoch=-1):
+
+        def lr_lambda(step):
+            if step < warmup_steps:
+                return float(step) / float(max(1.0, warmup_steps))
+            return 1.
+
+        super(WarmupConstantSchedule, self).__init__(optimizer, lr_lambda, last_epoch=last_epoch)

@@ -201,11 +201,11 @@ class Dataloader(pl.LightningDataModule):
                 train_df = train_df.reset_index(drop=True)
                 valid_df = valid_df.reset_index(drop=True)
                 
-                train_inputs = train_df.drop(['label'], axis=1)
-                train_targets = train_df['label']
+                train_x = train_df.drop(['label'], axis=1)
+                train_y = train_df['label']
                 
-                val_inputs = valid_df.drop(['label'], axis=1)
-                val_targets = valid_df['label']
+                val_x = valid_df.drop(['label'], axis=1)
+                val_y = valid_df['label']
             
             train_inputs = tokenizing_method(train_x)
             train_targets = [self.label2num[label] for label in train_y]
