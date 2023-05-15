@@ -30,7 +30,7 @@ def get_best_check_point(save_path):
 
 
 def get_add_special_tokens():
-    arr = ['[OTH]', '[ENT]', '[/ENT]', '[SUB]', '[OBJ]']
+    arr = ['[OTH]', '[ENT]', '[/ENT]', '[SUB]', '[OBJ]', '[PER]', '[LOC]', '[POH]', '[DAT]', '[NOH]', '[ORG]']
 
     # entity detail
     for category in ['S', 'O']:

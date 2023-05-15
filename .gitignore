@@ -15,6 +15,9 @@ dataset/*
 use_config.yaml
 results/
 .netrc
+data_analysis/CJW_viz.ipynb
+ADVS
+tapt_model
 
 lightning_logs
 nohup.out

@@ -39,6 +39,7 @@ if __name__ == "__main__":
     tokenizer.add_special_tokens({
         'additional_special_tokens': special_tokens_list
     })
+    
     dataloader = data_controller.Dataloader(tokenizer, CFG)
     LM = AutoModelForSequenceClassification.from_pretrained(
         pretrained_model_name_or_path=CFG['train']['model_name'], num_labels=30,
@@ -54,7 +55,8 @@ if __name__ == "__main__":
                                  dirpath=f"{save_path}/checkpoints",
                                  filename="{epoch}-{val_micro_f1_Score:.4f}",
                                  mode='max')
-    callbacks = [checkpoint]
+    lr_monitor = LearningRateMonitor()
+    callbacks = [checkpoint,lr_monitor]
     # Earlystopping
     if CFG['option']['early_stop']:
         early_stopping = EarlyStopping(
