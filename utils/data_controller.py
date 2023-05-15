@@ -269,30 +269,6 @@ class DataCleaning():
             if pattern.search(df.loc[i,'object_entity']):
                 df.loc[i, 'object_entity'] = hangulize(df.loc[i, 'object_entity'], language)
         return df
-
-    def entity_mask(self, df):
-        """ sentence 컬럼에서 subject_entity와 object_entity에 마스킹 처리(index 기준으로)
-        subject_entity → [SUB] 마스킹
-        object_entity → [OBJ] 마스킹
-        
-        Note: <데이터 예시>
-        〈Something〉는 조지 해리슨이 쓰고 비틀즈가 1969년 앨범 《Abbey Road》에 담은 노래다.
-            ↓
-        〈Something〉는 [OBJ]이 쓰고 [SUB]가 1969년 앨범 《Abbey Road》에 담은 노래다.
-        
-        Arguments:
-        df: entity_mask를 수행하고자 하는 DataFrame
-        
-        Return:
-        df: entity_mask 작업이 완료된 DataFrame
-        """
-        for idx, row in df.iterrows():
-            if row['subject_start_idx']<row['object_start_idx']:
-                df.loc[idx,'sentence']=row['sentence'][:row['subject_start_idx']]+'[SUB]'+row['sentence'][row['subject_end_idx']+1:row['object_start_idx']]+'[OBJ]'+row['sentence'][row['object_end_idx']+1:]
-            else:
-                df.loc[idx,'sentence']=row['sentence'][:row['object_start_idx']]+'[OBJ]'+row['sentence'][row['object_end_idx']+1:row['subject_start_idx']]+'[SUB]'+row['sentence'][row['subject_end_idx']+1:]
-        
-        return df
     
     def remove_duplicated(self, df):
         """
@@ -393,6 +369,63 @@ class DataCleaning():
         lib = Spacing()
 
         df['sentence'] = df['sentence'].apply(lambda x: lib(x.replace(" ", "")))
+
+    def entity_mask_base(self, df):
+        """
+        sentence, subject_entity, object_entity 컬럼에서 subject_entity와 object_entity에 마스킹 처리
+        [ENT] subject_entity [/ENT] → [SUB] 마스킹
+        [ENT] object_entity [/ENT]→ [OBJ] 마스킹
+        
+        *** add_entity_tokens_base 함수를 먼저 적용해줘야 함! ***
+
+        Note: <데이터 예시>
+        〈Something〉는 [ENT] 조지 해리슨 [/ENT] 이 쓰고 [ENT] 비틀즈 [/ENT] 가 1969년 앨범 《Abbey Road》에 담은 노래다.
+            ↓
+        〈Something〉는 [OBJ] 이 쓰고 [SUB] 가 1969년 앨범 《Abbey Road》에 담은 노래다.
+        
+        Arguments:
+        df: add_entity_tokens_base 함수를 적용한 DataFrame
+        
+        Return:
+        df: subject_entity와 object_entity에 마스킹 처리 작업이 완료된 DataFrame
+        """
+        for idx, row in df.iterrows():
+            words=re.findall('\[ENT].+?\[/ENT]',row['sentence'])
+            if row['subject_start_idx']<row['object_start_idx']:
+                df.loc[idx,'sentence']=row['sentence'].replace(words[0],'[SUB]').replace(words[1],'[OBJ]')
+            else:
+                df.loc[idx,'sentence']=row['sentence'].replace(words[0],'[OBJ]').replace(words[1],'[SUB]')
+        
+        df['subject_entity']='[SUB]'
+        df['object_entity']='[OBJ]'
+
+        return df
+
+    def entity_mask_detail(self, df):
+        """
+        sentence, subject_entity, object_entity 컬럼에서 subject_entity와 object_entity에 마스킹 처리
+        [S:{type}] subject_entity [/S:{type}] → [S:{type}] 마스킹
+        [O:{type}] object_entity [/O:{type}] → [O:{type}] 마스킹
+        
+        *** add_entity_tokens_detail 함수를 먼저 적용해줘야 함! ***
+
+        Note: <데이터 예시>
+        〈Something〉는 [O:PER] 조지 해리슨 [/O:PER] 이 쓰고 [S:ORG] 비틀즈 [/S:ORG] 가 1969년 앨범 《Abbey Road》에 담은 노래다.
+            ↓
+        〈Something〉는 [O:PER] 이 쓰고 [S:ORG] 가 1969년 앨범 《Abbey Road》에 담은 노래다.
+        
+        Arguments:
+        df: add_entity_tokens_detail 함수를 적용한 DataFrame
+        
+        Return:
+        df: subject_entity와 object_entity에 마스킹 처리 작업이 완료된 DataFrame
+        """
+        df['sentence']=df['sentence'].apply(lambda x: re.sub(r'\[S:.+?].+?\[/S:.+?]',re.findall(r'\[S:.+?]',x)[0],x))
+        df['sentence']=df['sentence'].apply(lambda x: re.sub(r'\[O:.+?].+?\[/O:.+?]',re.findall(r'\[O:.+?]',x)[0],x))
+        df['subject_entity']=df['sentence'].apply(lambda x: re.findall(r'\[S:.+?]',x)[0])
+        df['object_entity']=df['sentence'].apply(lambda x: re.findall(r'\[O:.+?]',x)[0])
+
+        return df
 
     def dc_hanspell(self, df):
         """ 
