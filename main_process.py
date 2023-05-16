@@ -7,12 +7,14 @@ import pytorch_lightning as pl
 import wandb
 
 from models.models import Model
+from models.models import TAPTModel
 from utils import utils, data_controller
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, AutoModelForMaskedLM
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import LearningRateMonitor
+from shutil import copyfile
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -39,11 +41,47 @@ if __name__ == "__main__":
     tokenizer.add_special_tokens({
         'additional_special_tokens': CFG['train']['special_tokens_list']
     })
+    
     dataloader = data_controller.Dataloader(tokenizer, CFG)
-    LM = AutoModelForSequenceClassification.from_pretrained(
-        pretrained_model_name_or_path=CFG['train']['model_name'], num_labels=30)
+    
+    if CFG['train']['TAPT']:
+        # Pretrain on combined train and test data (TAPT)
+        if not os.path.exists("./tapt_model"):
+            LM = AutoModelForMaskedLM.from_pretrained(CFG['train']['model_name'])
+            tapt_tokenizer = AutoTokenizer.from_pretrained(CFG['train']['model_name'])
+            tapt_dataloader = data_controller.TAPTDataloader(tapt_tokenizer)  # You'll need to implement this
+            tapt_model = TAPTModel(LM)  # You'll need to implement this
+
+            tapt_logger = WandbLogger(name="TAPT", project="TAPT")
+            
+            checkpoint_callback = ModelCheckpoint(
+                        monitor='val_loss',
+                        dirpath='./tapt_model',
+                        filename='best_model-{epoch:02d}-{val_loss:.2f}',
+                        save_top_k=1,
+                        mode='min',
+                    )
+            early_stopping = EarlyStopping(monitor='val_loss',
+                                           patience=5,
+                                           mode='min',
+                                           verbose=True)
+
+            tapt_trainer = pl.Trainer(accelerator='gpu',
+                                      max_epochs=100,
+                                      logger = tapt_logger,
+                                      callbacks = [early_stopping, checkpoint_callback])
+            tapt_trainer.fit(tapt_model, tapt_dataloader)
+            tapt_model.LM.save_pretrained("./tapt_model")
+            # Fine-tune on actual training data
+        LM = AutoModelForSequenceClassification.from_pretrained("./tapt_model", num_labels=30)
+            
+    else:    
+        LM = AutoModelForSequenceClassification.from_pretrained(
+        pretrained_model_name_or_path=CFG['train']['model_name'], num_labels=30,
+        output_hidden_states=True, output_attentions=True)
+    
     LM.resize_token_embeddings(len(tokenizer))
-    model = Model(LM, CFG)
+    model = Model(LM, tokenizer, CFG)
     # check point
     checkpoint = ModelCheckpoint(monitor='val_micro_f1_Score',
                                  save_top_k=CFG['train']['save_top_k'],
@@ -53,7 +91,10 @@ if __name__ == "__main__":
                                  dirpath=f"{save_path}/checkpoints",
                                  filename="{epoch}-{val_micro_f1_Score:.4f}",
                                  mode='max')
-    callbacks = [checkpoint]
+    
+    lr_monitor = LearningRateMonitor(logging_interval='step')
+    
+    callbacks = [checkpoint, lr_monitor]
     # Earlystopping
     if CFG['option']['early_stop']:
         early_stopping = EarlyStopping(
@@ -61,10 +102,11 @@ if __name__ == "__main__":
         callbacks.append(early_stopping)
     # fit
     trainer = pl.Trainer(accelerator='gpu',
+                         precision="16-mixed",
                          max_epochs=CFG['train']['epoch'],
                          default_root_dir=save_path,
                          log_every_n_steps=1,
-                         val_check_interval=0.5,           # 1 epoch 당 valid loss 2번 체크: 학습여부 빠르게 체크
+                         val_check_interval=0.25,           # 1 epoch 당 valid loss 4번 체크: 학습여부 빠르게 체크
                          logger=wandb_logger,
                          callbacks=callbacks)
 
@@ -99,3 +141,4 @@ if __name__ == "__main__":
 
         pred_label, probs = inference_model(model, dataloader)
         utils.save_csv(submit, pred_label, probs, save_path, folder_name, ckpt_name.split('=')[-1][:7])
+    copyfile('use_config.yaml','f"{save_path}/config.yaml"')
