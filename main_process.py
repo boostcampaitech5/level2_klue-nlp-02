@@ -93,8 +93,19 @@ if __name__ == "__main__":
                                  mode='max')
     
     lr_monitor = LearningRateMonitor(logging_interval='step')
+    callbacks = [lr_monitor]
     
-    callbacks = [checkpoint, lr_monitor]
+    checkpoint = ModelCheckpoint(monitor='val_micro_f1_Score',
+                                 save_top_k=CFG['train']['save_top_k'],
+                                 save_last=False,
+                                 save_weights_only=True,
+                                 verbose=True,
+                                 dirpath=f"{save_path}/checkpoints",
+                                 filename="{epoch}-{val_micro_f1_Score:.4f}",
+                                 mode='max')
+    if not CFG['train']['no_valid']:
+            callbacks.append(checkpoint)
+    
     # Earlystopping
     if CFG['option']['early_stop']:
         early_stopping = EarlyStopping(
@@ -102,7 +113,7 @@ if __name__ == "__main__":
         callbacks.append(early_stopping)
     # fit
     trainer = pl.Trainer(accelerator='gpu',
-                         precision="16-mixed",
+                         precision="16-mixed" if CFG['train']['halfprecision'] else 32,
                          max_epochs=CFG['train']['epoch'],
                          default_root_dir=save_path,
                          log_every_n_steps=1,
@@ -134,11 +145,11 @@ if __name__ == "__main__":
 
     utils.save_csv(submit, pred_label, probs, save_path, folder_name)
 
-    for ckpt_name in tqdm(os.listdir(f"{save_path}/checkpoints"), desc="inferencing_ckpt"):
-        print("Now...  "+ ckpt_name)
-        checkpoint = torch.load(f"{save_path}/checkpoints/{ckpt_name}")
-        model.load_state_dict(checkpoint['state_dict'])
+    if checkpoint in callbacks:
+        for ckpt_name in tqdm(os.listdir(f"{save_path}/checkpoints"), desc="inferencing_ckpt"):
+            print("Now...  "+ ckpt_name)
+            checkpoint = torch.load(f"{save_path}/checkpoints/{ckpt_name}")
+            model.load_state_dict(checkpoint['state_dict'])
 
-        pred_label, probs = inference_model(model, dataloader)
-        utils.save_csv(submit, pred_label, probs, save_path, folder_name, ckpt_name.split('=')[-1][:7])
-    copyfile('use_config.yaml','f"{save_path}/config.yaml"')
+            pred_label, probs = inference_model(model, dataloader)
+            utils.save_csv(submit, pred_label, probs, save_path, folder_name, ckpt_name.split('=')[-1][:7])

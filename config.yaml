@@ -33,6 +33,7 @@ train:
   LSTM:
     Do: True
     Truncate: True
+  halfprecision: True
 select_DC:
   - remove_duplicated
   # - normalize_class
