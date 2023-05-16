@@ -32,7 +32,7 @@ train:
   TAPT: False #
   LSTM:
     Do: True
-    Truncate: True
+    truncate: True
   halfprecision: True
 select_DC:
   - remove_duplicated
