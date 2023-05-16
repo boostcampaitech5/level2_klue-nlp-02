@@ -33,6 +33,7 @@ if __name__ == "__main__":
         CFG = yaml.load(f, Loader=yaml.FullLoader)
     # 실험 결과 파일 생성 및 폴더명 가져오기
     folder_name, save_path = utils.get_folder_name(CFG, args)
+    copyfile('use_config.yaml',f"{save_path}/config.yaml")
     # seed 설정
     pl.seed_everything(CFG['seed'])
     # wandb 설정
@@ -148,4 +149,3 @@ if __name__ == "__main__":
 
         pred_label, probs = inference_model(model, dataloader)
         utils.save_csv(submit, pred_label, probs, save_path, folder_name, ckpt_name.split('=')[-1][:7])
-    copyfile('use_config.yaml','f"{save_path}/config.yaml"')
