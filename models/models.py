@@ -189,6 +189,9 @@ class Model(pl.LightningModule):
             scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.5,verbose=True)
         elif self.CFG['train']['LR']['name'] == 'WarmupConstantLR':
             scheduler = train.WarmupConstantLR(optimizer, warmup_steps=self.CFG['train']['LR']['warmupconstantLR_step'])
+        elif self.CFG['train']['LR']['name'] == 'WarmupDecayLR':
+            scheduler = train.WarmupDecayLR(optimizer, warmup_steps=self.CFG['train']['LR']['warmupdecayLR_warmup'], total_steps=self.CFG['train']['LR']['warmupdecayLR_total'])
+
         
         lr_scheduler = {
             'scheduler': scheduler,
