@@ -10,7 +10,7 @@ def get_folder_name(CFG, args):
     실험 결과를 기록하기 위해 초 단위 날짜 정보를 고유 키로 선정
     """
     now = datetime.now(tz=timezone(timedelta(hours=9)))
-    folder_name = f"{now.strftime('%m/%d_%H:%M:%S')}_{CFG['name']}_{args.exp_name}"
+    folder_name = f"{now.strftime('%m=%d_%H:%M:%S')}_{CFG['name']}_{args.exp_name}"
     save_path = f"./results/{folder_name}"
     CFG['save_path'] = save_path
     os.makedirs(save_path)
