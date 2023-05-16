@@ -189,6 +189,9 @@ class Model(pl.LightningModule):
             scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.5,verbose=True)
         elif self.CFG['train']['LR']['name'] == 'WarmupConstantLR':
             scheduler = train.WarmupConstantLR(optimizer, warmup_steps=self.CFG['train']['LR']['warmupconstantLR_step'])
+        elif self.CFG['train']['LR']['name'] == 'WarmupDecayLR':
+            scheduler = train.WarmupDecayLR(optimizer, warmup_steps=self.CFG['train']['LR']['warmupdecayLR_warmup'], total_steps=self.CFG['train']['LR']['warmupdecayLR_total'])
+
         
         lr_scheduler = {
             'scheduler': scheduler,
@@ -230,7 +233,7 @@ class Model(pl.LightningModule):
         # 1. Batch 각각에 대해 ENT token의 위치를 [first ent idx, second ent idx] 형태로 저장.
         ent_indices = []
         for i in range(len(x['input_ids'])):
-            ent_indices_batch = torch.where(x['input_ids'][i] == ENT_TOKEN_ID)[0]
+            ent_indices_batch = torch.where(x['input_ids'][i] == self.ent_id)[0]
             # 1-1. 입력문장이 길 경우 ENT가 2개 마킹되지 않고 truncated 되는 경우에 대한 예외처리
             if ent_indices_batch.size(-1) == 2:
                 ent_indices.append(ent_indices_batch)

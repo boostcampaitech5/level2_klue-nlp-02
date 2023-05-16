@@ -28,7 +28,7 @@ class Dataset(Dataset):
 
     def __getitem__(self, idx):
         if self.no_valid:
-            return None, None, None
+            return [], [], []
         
         inputs = {key: val[idx].clone().detach()
                   for key, val in self.inputs.items()}
