@@ -1,11 +1,12 @@
 import os
-from tqdm.auto import tqdm
+import argparse
 import torch
 import yaml
 import pandas as pd
 import pytorch_lightning as pl
 import wandb
 
+from tqdm.auto import tqdm
 from models.models import Model
 from models.models import TAPTModel
 from utils import utils, data_controller
@@ -21,11 +22,17 @@ warnings.filterwarnings('ignore')
 
 if __name__ == "__main__":
     """---Setting---"""
+    # argsparse 이용해서 실험명 가져오기
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-n', '--exp_name', type=str)
+    args = parser.parse_args()
+    # args.exp_name이 None이면 assert False라서 에러 발생 시키기
+    assert args.exp_name is not None, "실험명을 입력해주세요."
     # config 파일 불러오기
     with open('./use_config.yaml') as f:
         CFG = yaml.load(f, Loader=yaml.FullLoader)
     # 실험 결과 파일 생성 및 폴더명 가져오기
-    folder_name, save_path = utils.get_folder_name(CFG)
+    folder_name, save_path = utils.get_folder_name(CFG, args)
     # seed 설정
     pl.seed_everything(CFG['seed'])
     # wandb 설정
