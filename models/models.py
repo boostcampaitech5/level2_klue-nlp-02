@@ -46,6 +46,43 @@ def focal_loss(logits, y, sub_obj_types, types2labelnum, alpha=0.5, gamma=2., pe
     return loss
 
 
+def Adaptive_Threshold_loss(logits, labels):
+    """
+    Note:       ALTOP - Adaptive Threshold loss를 계산합니다.
+                TH label(기준)을 설정하여 Positive label logit은 더 높게, negative label logits은 더 낮도록 패널티를 줍니다.
+                참고 링크: https://arxiv.org/pdf/2010.11304.pdf
+
+    Arguments:
+    logits: (batch, num_classes)
+    labels: (batch, )
+    
+    Return:
+    loss:   (batch, ), torch.tensor([scalar])
+    """
+    
+    # 1. Threshold 라벨 설정: TH label = no_relation -> no_relation 보다는 logit 값이 높도록 설정
+    labels = F.one_hot(labels, num_classes=logits.size(-1))
+    threshold_label = torch.zeros_like(labels, dtype=torch.float).to(labels)   # (batch, num_classes)
+    threshold_label[:, 0] = 1                   # TH label = no_relation
+    labels[:, 0] = 0
+
+    positive_mask = labels + threshold_label    # (batch, num_classes) -> 원래 label 과 같다.
+    negative_mask = 1 - labels                  # (batch, num_classes) -> 정답 label이 아닌 다른 모든 label이 1로 설정된다.
+    
+    # 2. loss = l1 + l2
+    logit1 = logits - (1 - positive_mask) * 1e30
+    loss1 = -(F.log_softmax(logit1, dim=-1) * labels).sum(1)
+    
+    logit2 = logits - (1 - negative_mask) * 1e30
+    loss2 = -(F.log_softmax(logit2, dim=-1) * threshold_label).sum(1)
+    
+    # 3. Sum
+    loss = loss1 + loss2
+    loss = loss.mean()
+    
+    return loss
+
+
 class Model(pl.LightningModule):
     def __init__(self, LM, tokenizer, CFG):
         super().__init__()
@@ -120,8 +157,9 @@ class Model(pl.LightningModule):
             attention_mask=x['attention_mask'],
             token_type_ids=x['token_type_ids']
         )
-        loss = self.loss_func(outputs['logits'], y) if self.CFG['train']['lossF']['name'] != 'focal_loss' \
-        else focal_loss(outputs['logits'], y, sub_obj_types, self.types2labelnum, self.CFG['train']['lossF']['focal_loss_scale'])
+        loss = self.loss_func(outputs['logits'], y) if self.CFG['train']['lossF']['name'] != 'focal_loss' else\
+            Adaptive_Threshold_loss(outputs['logits'], y) if self.CFG['train']['lossF']['name'] == 'Adaptive_Threshold_loss' else\
+            focal_loss(outputs['logits'], y, sub_obj_types, self.types2labelnum, self.CFG['train']['lossF']['focal_loss_scale'])
 
         # multi-task learning: type classify 학습
         if self.CFG['select_DC'] is not None and "add_entity_tokens_base" in self.CFG['select_DC'] and self.CFG['train']['type_classify']:
