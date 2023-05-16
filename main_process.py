@@ -90,11 +90,11 @@ if __name__ == "__main__":
     
     LM.resize_token_embeddings(len(tokenizer))
     model = Model(LM, tokenizer, CFG)
-    # check point
     
     lr_monitor = LearningRateMonitor(logging_interval='step')
     callbacks = [lr_monitor]
     
+    # check point
     checkpoint = ModelCheckpoint(monitor='val_micro_f1_Score',
                                  save_top_k=CFG['train']['save_top_k'],
                                  save_last=False,
