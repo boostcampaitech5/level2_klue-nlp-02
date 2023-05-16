@@ -17,7 +17,7 @@ train:
     warmupdecayLR_total:  4200 # step 기준으로 계산
     interval: step # epoch
   lossF:
-    name: CrossEntropyLoss # focal_loss
+    name: CrossEntropyLoss # focal_loss # Adaptive_Threshold_loss
     focal_loss_scale: 0.5
     smooth_scale: 0.0 # 일반 CE 쓰고싶을 경우 0.0
   optim: 옵티마이저 함수명
