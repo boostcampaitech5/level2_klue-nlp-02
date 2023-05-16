@@ -30,7 +30,7 @@ train:
   TAPT: False #
   LSTM:
     Do: True
-    Truncate: True
+    truncate: True
 select_DC:
   - remove_duplicated
   # - normalize_class
