@@ -1,15 +1,16 @@
 import os
+import argparse
 
 from datetime import datetime, timezone, timedelta
 from glob import glob
 
 
-def get_folder_name(CFG):
+def get_folder_name(CFG, args):
     """
     실험 결과를 기록하기 위해 초 단위 날짜 정보를 고유 키로 선정
     """
     now = datetime.now(tz=timezone(timedelta(hours=9)))
-    folder_name = now.strftime('%Y-%m-%d-%H:%M:%S') + f"_{CFG['name']}"
+    folder_name = f"{now.strftime('%m-%d_%H:%M:%S')}_{CFG['name']}_{args.exp_name}"
     save_path = f"./results/{folder_name}"
     CFG['save_path'] = save_path
     os.makedirs(save_path)
@@ -48,4 +49,16 @@ def save_csv(submit, pred_label, probs, save_path, folder_name, filename='last')
 
 
 if __name__ == "__main__":
-    pass
+    # args로 실험명 지정 받기
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-n', '--exp_name', type=str)
+    args = parser.parse_args()
+
+    if args.exp_name is None:
+        print("실험명을 입력해주세요")
+        exit()
+
+    now = datetime.now(tz=timezone(timedelta(hours=9)))
+    folder_name = now.strftime('%m-%d-%H:%M:%S') + f"_{'테스트'}" + f"_{args.exp_name}"
+    
+    print(folder_name)
