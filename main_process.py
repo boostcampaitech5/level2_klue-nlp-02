@@ -35,9 +35,9 @@ if __name__ == "__main__":
     """---Train---"""
     # 데이터 로더와 모델 가져오기
     tokenizer = AutoTokenizer.from_pretrained(CFG['train']['model_name'])
-    special_tokens_list = utils.get_add_special_tokens()
+    CFG['train']['special_tokens_list'] = utils.get_add_special_tokens()
     tokenizer.add_special_tokens({
-        'additional_special_tokens': special_tokens_list
+        'additional_special_tokens': CFG['train']['special_tokens_list']
     })
     dataloader = data_controller.Dataloader(tokenizer, CFG)
     LM = AutoModelForSequenceClassification.from_pretrained(
