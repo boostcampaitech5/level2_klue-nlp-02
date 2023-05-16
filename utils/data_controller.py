@@ -186,8 +186,7 @@ class Dataloader(pl.LightningDataModule):
                                                                 stratify=train_y,
                                                                 test_size=self.CFG['train']['test_size'],
                                                                 shuffle=self.CFG['train']['shuffle'],
-                                                                random_state=42
-                                                                )
+                                                                random_state=self.CFG['seed'])
             else:
                 # Sort the dataframe by similarity score in descending order
                 df = x.sort_values(by='prob_1', ascending=False)
@@ -945,7 +944,7 @@ class DataAugmentation():
                     
                     # 5. 거꾸로 서로 교체. -> 데이터 2배 증가
                     for idx, (id, sub_en_target, obj_en_target) in enumerate(tuple_list):
-                        sent_target = df_copied.loc[id]['sentence']
+                        sent_target = df_copied[df_copied['id']==id]['sentence'].values[0]
                         
                         sub_en_change = tuple_list[len(tuple_list)-idx-1][1]
                         obj_en_chage = tuple_list[len(tuple_list)-idx-1][2]
@@ -959,7 +958,7 @@ class DataAugmentation():
 
                         # 5-1. 변경하지 않는 컬럼 성분은 그냥 복붙.
                         for c in copy_element:
-                            aug_dict[c].append(df.loc[id][c])
+                            aug_dict[c].append(df[df['id']==id][c].values[0])
                             
         aug_df = pd.DataFrame(aug_dict)
         
@@ -970,12 +969,10 @@ def load_data():
     """
     학습 데이터와 테스트 데이터 DataFrame 가져오기
     """
-    # train_df = pd.read_csv('./dataset/new_train.csv')
+    train_df = pd.read_csv('./dataset/new_train.csv')
     # train_df.drop(['id', 'source'], axis=1, inplace=True)
-    # test_x = pd.read_csv('./dataset/new_test.csv')
+    test_x = pd.read_csv('./dataset/new_test.csv')
     # test_x.drop(['id', 'source'], axis=1, inplace=True)
-    train_df = pd.read_csv('/opt/ml/level2_klue-nlp-02/dataset/train/train.csv')
-    test_x = pd.read_csv('/opt/ml/level2_klue-nlp-02/dataset/test/test_data.csv')
     
     return train_df, test_x
 
@@ -1006,7 +1003,7 @@ if __name__ == "__main__":
     test_df = pd.read_csv('./dataset/test/test_data.csv')
     
     # 중복 제거
-    train_df = train_df[['sentence','subject_entity','object_entity','source','label']].drop_duplicates()
+    train_df = train_df.iloc[train_df[['sentence','subject_entity','object_entity','source','label']].drop_duplicates().index]
 
     # entity_parsing이 적용된 DataFrame 파일 만들기
     new_train_df = DataCleaning([]).entity_parsing(train_df.copy(deep=True))

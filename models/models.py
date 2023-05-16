@@ -120,8 +120,7 @@ class Model(pl.LightningModule):
             attention_mask=x['attention_mask'],
             token_type_ids=x['token_type_ids']
         )
-        loss = self.loss_func(outputs['logits'],
-                              y) if self.CFG['train']['lossF']['name'] != 'focal_loss' \
+        loss = self.loss_func(outputs['logits'], y) if self.CFG['train']['lossF']['name'] != 'focal_loss' \
         else focal_loss(outputs['logits'], y, sub_obj_types, self.types2labelnum, self.CFG['train']['lossF']['focal_loss_scale'])
 
         # multi-task learning: type classify 학습
@@ -178,7 +177,7 @@ class Model(pl.LightningModule):
         elif self.CFG['train']['LR']['name'] == 'StepLR':
             scheduler = torch.optim.lr_scheduler.StepLR(
                 optimizer=optimizer,
-                step_size=4,
+                step_size=10,
                 gamma=0.7,
                 verbose=True)
         elif self.CFG['train']['LR']['name'] == 'CyclicLR':
@@ -193,7 +192,7 @@ class Model(pl.LightningModule):
         
         lr_scheduler = {
             'scheduler': scheduler,
-            # 'interval' : self.CFG['train']['LR']['interval'],
+            'interval' : self.CFG['train']['LR']['interval'],
             'name': self.CFG['train']['LR']['name']
         }
 
