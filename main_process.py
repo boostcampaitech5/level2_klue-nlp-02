@@ -151,5 +151,5 @@ if __name__ == "__main__":
             checkpoint = torch.load(f"{save_path}/checkpoints/{ckpt_name}")
             model.load_state_dict(checkpoint['state_dict'])
 
-            pred_label, probs = inference_model(model, dataloader)
-            utils.save_csv(submit, pred_label, probs, save_path, folder_name, ckpt_name.split('=')[-1][:7])
+        pred_label, probs = inference_model(model, dataloader)
+        utils.save_csv(submit, pred_label, probs, save_path, folder_name, ckpt_name.split('=')[-1][:7])

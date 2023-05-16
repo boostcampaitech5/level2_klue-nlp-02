@@ -58,7 +58,7 @@ class Model(pl.LightningModule):
         self.sep_id = tokenizer.sep_token_id    # Separator token ID
         self.ent_id = tokenizer.convert_tokens_to_ids('[ENT]')
         
-        self.loss_func = torch.nn.CrossEntropyLoss(label_smoothing = CFG['train']['lossF']['smooth_scale'])
+        self.loss_func = torch.nn.CrossEntropyLoss(label_smoothing = self.CFG['train']['lossF']['smooth_scale'])
         self.optim = eval("torch.optim." + self.CFG['train']['optim'])
         
         # LSTM layer 초기화
@@ -228,8 +228,6 @@ class Model(pl.LightningModule):
         entity_outs: Tuple((batch, num_types), (batch, num_types))
         """
         
-        # ENT_TOKEN_ID = self.tokenizer.convert_tokens_to_ids('[ENT]')
-        
         # 1. Batch 각각에 대해 ENT token의 위치를 [first ent idx, second ent idx] 형태로 저장.
         ent_indices = []
         for i in range(len(x['input_ids'])):
@@ -273,10 +271,11 @@ class Model(pl.LightningModule):
         # entity type 분류 모델 학습을 위한 type 데이터 생성: string -> number(using dict)
         type_list = ['PER', 'NOH', 'ORG', 'LOC', 'POH', 'DUR', 'PNT', 'TIM', 'MNY', 'DAT']
         type_dict = {key:value for value, key in enumerate(type_list)}
-        ##
         
-        loss_head = self.type_classify_loss(preds_head, type_dict[_type[0]])
-        loss_tail = self.type_classify_loss(preds_tail, type_dict[_type[1]])
+        target_head = torch.tensor([type_dict[i] for i in _type[0]]).type(torch.LongTensor).to('cuda:0')
+        target_tail = torch.tensor([type_dict[i] for i in _type[1]]).type(torch.LongTensor).to('cuda:0')
+        loss_head = self.type_classify_loss(preds_head, target_head)
+        loss_tail = self.type_classify_loss(preds_tail, target_tail)
         
         type_loss = (loss_head + loss_tail)*alpha
         self.log('type_class_loss', type_loss)
