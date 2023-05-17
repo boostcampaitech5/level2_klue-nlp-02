@@ -20,6 +20,7 @@ ADVS
 tapt_model
 wandb
 ensemble/ingredients/*
+ensemble/foods/*
 
 lightning_logs
 nohup.out
