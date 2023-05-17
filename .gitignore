@@ -19,6 +19,7 @@ data_analysis/CJW_viz.ipynb
 ADVS
 tapt_model
 wandb
+ensemble/ingredients
 
 lightning_logs
 nohup.out
