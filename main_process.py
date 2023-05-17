@@ -115,7 +115,7 @@ if __name__ == "__main__":
     # fit
     trainer = pl.Trainer(accelerator='gpu',
                          precision="16-mixed" if CFG['train']['halfprecision'] else 32,
-                         accumulate_grad_batches=1,         # 배치사이즈=16이고 이 옵션이 2일때, batch=32와 같은 효과.
+                         accumulate_grad_batches=CFG['train']['gradient_accumulation'],
                          max_epochs=CFG['train']['epoch'],
                          default_root_dir=save_path,
                          log_every_n_steps=1,
