@@ -131,7 +131,7 @@ class Model(pl.LightningModule):
                 # Find the position of the [SEP] token
                 sep_positions = []
                 for seq in input_ids:
-                    sep_positions.append((seq == self.sep_id).nonzero(as_tuple=True)[0][0])
+                    sep_positions.append((seq == self.sep_id).nonzero(as_tuple=True)[0][-1])
 
                 # Prepare the sequences for LSTM
                 lstm_input = []

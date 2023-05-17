@@ -19,6 +19,8 @@ data_analysis/CJW_viz.ipynb
 ADVS
 tapt_model
 wandb
+ensemble/ingredients/*
+ensemble/foods/*
 
 lightning_logs
 nohup.out
