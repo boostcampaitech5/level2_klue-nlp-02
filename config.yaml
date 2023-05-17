@@ -17,18 +17,20 @@ train:
     warmupdecayLR_total:  4200 # step 기준으로 계산
     interval: step # epoch
   lossF:
-    name: 로스 함수명 # focal_loss # Adaptive_Threshold_loss
+    name: 로스 함수명 # CrossEntropyLoss # focal_loss # Adaptive_Threshold_loss
     focal_loss_scale: 0.5
     smooth_scale: 0.0 # 일반 CE 쓰고싶을 경우 0.0
+    rdrop: False
+    rdrop_alpha: 1.0
   optim: 옵티마이저 함수명
   shuffle: True
   token_max_len: 100
   patience: 5
   test_size: 0.2
-  save_top_k: 3 # Inference할 top k개의 모델.
-  type_classify: False
-  adverse_valid: False #
-  no_valid: False # valid set 안 씀
+  save_top_k: 3         # Inference할 top k개의 모델.
+  type_classify: False  # multi-task learning: ENT type classification
+  adverse_valid: False  #
+  no_valid: False       # valid set 안 씀
   valid_split_beforehand: False # TRUE일 경우 remove_duplicate 사용 불가
   TAPT: False #
   LSTM:
