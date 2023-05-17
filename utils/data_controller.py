@@ -1,6 +1,7 @@
 import re
 import pickle
 import torch
+import yaml
 import pandas as pd
 import pytorch_lightning as pl
 
@@ -96,7 +97,8 @@ class Dataloader(pl.LightningDataModule):
         self.CFG = CFG
         self.tokenizer = tokenizer
         
-        train_df, predict_x = load_data()
+        train_df, predict_x, val_df = load_data()
+        self.valid_df = val_df
         self.train_df = train_df
         self.predict_x = predict_x
         self.label2num = load_label2num()
@@ -182,7 +184,13 @@ class Dataloader(pl.LightningDataModule):
                 train_x = x.drop(['label'], axis=1)
                 train_y = x['label']
             
-                train_x, val_x, train_y, val_y = train_test_split(train_x, train_y,
+                if self.CFG['train']['valid_split_beforehand']:
+                    train_x, train_y = train_x, train_y
+                    _valid_df = DC.process(self.valid_df.copy(), train=False)
+                    val_x = _valid_df.drop(['label'], axis=1)
+                    val_y = _valid_df['label']
+                else:
+                    train_x, val_x, train_y, val_y = train_test_split(train_x, train_y,
                                                                 stratify=train_y,
                                                                 test_size=self.CFG['train']['test_size'],
                                                                 shuffle=self.CFG['train']['shuffle'],
@@ -969,12 +977,27 @@ def load_data():
     """
     학습 데이터와 테스트 데이터 DataFrame 가져오기
     """
+    with open('./use_config.yaml') as f:
+        CFG = yaml.load(f, Loader=yaml.FullLoader)
+        
     train_df = pd.read_csv('./dataset/new_train.csv')
-    # train_df.drop(['id', 'source'], axis=1, inplace=True)
     test_x = pd.read_csv('./dataset/new_test.csv')
+    # train_df.drop(['id', 'source'], axis=1, inplace=True)
     # test_x.drop(['id', 'source'], axis=1, inplace=True)
+    val_df = None
+     
+    if CFG['train']['valid_split_beforehand']:
+        # validation set을 미리 만들어두는 옵션 -> if self.CFG['train']['valid_split_beforehand']:
+        train_x = train_df.drop(['label'], axis=1)
+        train_y = train_df['label']
+        train_x, val_x, train_y, val_y = train_test_split(train_x, train_y, stratify=train_y, test_size=CFG['train']['test_size'], shuffle=CFG['train']['shuffle'], random_state=CFG['seed'])
+        
+        train_df = pd.concat([train_x, train_y], axis=1)
+        val_df = pd.concat([val_x, val_y], axis=1)
+        train_df.to_csv('./dataset/train_splitted.csv', index=False)
+        val_df.to_csv('./dataset/val_splitted.csv', index=False)
     
-    return train_df, test_x
+    return train_df, test_x, val_df
 
 
 def load_label2num():
