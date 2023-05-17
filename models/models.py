@@ -200,6 +200,17 @@ class Model(pl.LightningModule):
 
         return preds, probs.tolist()
 
+    def confusion_matrix_inference(self, x):
+        outputs = self(
+            input_ids=x['input_ids'].to('cuda'),
+            attention_mask=x['attention_mask'].to('cuda'),
+            token_type_ids=x['token_type_ids'].to('cuda')
+        )
+        probs = F.softmax(outputs['logits'], dim=-1)
+        preds = np.argmax(probs.cpu().detach().numpy(), axis=-1)
+
+        return preds, probs.tolist()
+
     def configure_optimizers(self):
         if self.CFG['train']['optim'] == 'SGD':
             optimizer = self.optim(self.parameters(), lr=self.CFG['train']['LR']['lr'], momentum=0.9,weight_decay=1e-7)
