@@ -233,7 +233,7 @@ class Model(pl.LightningModule):
         
         lr_scheduler = {
             'scheduler': scheduler,
-            # 'interval' : self.CFG['train']['LR']['interval'],
+            'interval' : self.CFG['train']['LR']['interval'],
             'name': self.CFG['train']['LR']['name']
         }
 
