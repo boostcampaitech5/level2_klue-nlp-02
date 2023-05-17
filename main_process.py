@@ -37,11 +37,8 @@ if __name__ == "__main__":
     # seed 설정
     pl.seed_everything(CFG['seed'])
     # wandb 설정
-    _train_name = "Norm/ENTbase/ENTdetail/TypeCl/swap/SOch/LSTM"
-    wandb_name = f"B:{CFG['train']['batch_size']}_LR:{CFG['train']['LR']['lr']}_M:{CFG['train']['token_max_len']}_{_train_name}_{CFG['train']['lossF']['name']}_seed{CFG['seed']}_E:{CFG['train']['epoch']}"
-    
     wandb_logger = wandb.init(
-        name=wandb_name, project="level2-experiment", entity=CFG['wandb']['id'], dir=save_path)
+        name=folder_name, project="level2", entity=CFG['wandb']['id'], dir=save_path)
     wandb_logger = WandbLogger()
     wandb_logger.experiment.config.update(CFG)
 
