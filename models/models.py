@@ -226,8 +226,8 @@ class Model(pl.LightningModule):
         elif self.CFG['train']['LR']['name'] == 'StepLR':
             scheduler = torch.optim.lr_scheduler.StepLR(
                 optimizer=optimizer,
-                step_size=10,
-                gamma=0.7,
+                step_size=5,
+                gamma=0.3,
                 verbose=True)
         elif self.CFG['train']['LR']['name'] == 'CyclicLR':
             scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=self.CFG['train']['LR']['lr'] / self.CFG['train']['LR']['base'], 
@@ -302,7 +302,7 @@ class Model(pl.LightningModule):
         
         return (entity_head_out, entity_tail_out)
         
-    def type_classify_cal_loss(self, preds, _type, alpha=0.5):
+    def type_classify_cal_loss(self, preds, _type, alpha=0.8):
         """
         Note:   head [ENT], tail [ENT]로부터 분류한 각각의 entity type 에 대한 loss를 계산합니다.
 
