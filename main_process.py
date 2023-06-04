@@ -35,7 +35,8 @@ if __name__ == "__main__":
     folder_name, save_path = utils.get_folder_name(CFG, args)
     copyfile('use_config.yaml',f"{save_path}/config.yaml")
     # seed 설정
-    pl.seed_everything(CFG['seed'])
+    if not CFG['train']['lossF']['rdrop']:
+        pl.seed_everything(CFG['seed'])
     # wandb 설정
     wandb_logger = wandb.init(
         name=folder_name, project="level2", entity=CFG['wandb']['id'], dir=save_path)
@@ -114,12 +115,14 @@ if __name__ == "__main__":
     # fit
     trainer = pl.Trainer(accelerator='gpu',
                          precision="16-mixed" if CFG['train']['halfprecision'] else 32,
+                         accumulate_grad_batches=CFG['train']['gradient_accumulation'],
                          max_epochs=CFG['train']['epoch'],
                          default_root_dir=save_path,
                          log_every_n_steps=1,
                          val_check_interval=0.25,           # 1 epoch 당 valid loss 4번 체크: 학습여부 빠르게 체크
                          logger=wandb_logger,
-                         callbacks=callbacks)
+                         callbacks=callbacks,
+                         )
 
     trainer.fit(model=model, datamodule=dataloader)
 

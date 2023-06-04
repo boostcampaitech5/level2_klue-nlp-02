@@ -83,6 +83,28 @@ def Adaptive_Threshold_loss(logits, labels):
     return loss
 
 
+def rdrop_loss(p, q):
+    """
+    Note:   Rdrop loss를 계산합니다. kl_divergence loss를 추가 term으로 하여 추가 loss를 리턴합니다.
+            참고: https://arxiv.org/pdf/2106.14448.pdf
+    
+    Arguments:
+    logit1: (batch, num_classes)
+    logit2: (batch, num_classes)
+    
+    Return:
+    loss: kl_div loss
+    """
+    loss_p = F.kl_div(F.log_softmax(p, dim=-1), F.softmax(q, dim=-1), reduction='none')
+    loss_q = F.kl_div(F.log_softmax(q, dim=-1), F.softmax(p, dim=-1), reduction='none')
+
+    loss_p = loss_p.sum()
+    loss_q = loss_q.sum()
+
+    loss = (loss_q + loss_q) / 2
+    return loss
+    
+
 class Model(pl.LightningModule):
     def __init__(self, LM, tokenizer, CFG):
         super().__init__()
@@ -165,6 +187,19 @@ class Model(pl.LightningModule):
         if self.CFG['select_DC'] is not None and "add_entity_tokens_base" in self.CFG['select_DC'] and self.CFG['train']['type_classify']:
             preds = self.type_classify_forward(x, outputs['hidden_states'])
             loss += self.type_classify_cal_loss(preds, sub_obj_types, alpha=0.5)
+        
+        # R-drop loss 계산
+        if self.CFG['train']['lossF']['rdrop']:
+            logit_p = outputs['logits']
+            logit_q = self(
+                input_ids=x['input_ids'],
+                attention_mask=x['attention_mask'],
+                token_type_ids=x['token_type_ids']
+            )['logits']
+            
+            rloss = rdrop_loss(logit_p, logit_q)
+            loss += rloss * self.CFG['train']['lossF']['rdrop_alpha']
+            
         self.log("train_loss", loss)
 
         return loss
